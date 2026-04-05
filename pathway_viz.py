@@ -33,6 +33,7 @@ def draw_pathway(
     font_size: int = 9,
     figsize: tuple[float, float] = (10, 7),
     layout: str = "dot",          # 'dot' (hierarchical) or 'spring' / 'kamada_kawai'
+    positions: dict[str, tuple[float, float]] | None = None,
 ) -> None:
     """
     Draw a pathway graph with nodes colored by abundance.
@@ -48,6 +49,7 @@ def draw_pathway(
     font_size : label font size
     figsize   : (width, height) in inches
     layout    : graph layout algorithm
+    positions : optional dict {node: (x, y)} — overrides automatic layout
     """
     G = nx.DiGraph()
     G.add_edges_from(pathway)
@@ -58,7 +60,9 @@ def draw_pathway(
             G.add_node(node)
 
     # --- Layout ---
-    if layout == "dot":
+    if positions is not None:
+        pos = positions
+    elif layout == "dot":
         try:
             pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
         except Exception:
@@ -191,11 +195,44 @@ if __name__ == "__main__":
     # Any matplotlib colormap: 'RdYlGn', 'viridis', 'plasma', 'coolwarm', …
     colormap = "RdYlGn"
 
+    # Hand-tuned positions mirroring the reference figure layout
+    # x = left→right, y = top→bottom (y is inverted so higher = top)
+    positions = {
+        # Row 0 — precursor + COMT branch
+        "DOPA":     (0,  6),
+        "3-OMD":    (3,  6),
+        "VP":       (5,  6),
+        "VLA":      (7,  6),
+        # Row 1 — core synthesis
+        "DA":       (0,  4.5),
+        "NE":       (4,  4.5),
+        "EP":       (7,  4.5),
+        # Row 2 — first catabolism step
+        "3-MT":     (-2, 3),
+        "DOPAL":    (1,  3),
+        "DOPEGAL":  (4,  3),
+        "NMN":      (6,  3),
+        "MN":       (8,  3),
+        # Row 3 — second catabolism step
+        "MOPAL":    (-2, 1.5),
+        "DOPAC":    (0,  1.5),
+        "DOPET":    (2,  1.5),
+        "DOPEG":    (4,  1.5),
+        "DOMA":     (6,  1.5),
+        "MOPEGAL":  (8,  1.5),
+        # Row 4 — terminal metabolites
+        "HVA":      (-1, 0),
+        "MOPET":    (2,  0),
+        "MOPEG":    (4,  0),
+        "VMA":      (6,  0),
+    }
+
     draw_pathway(
         pathway=pathway,
         abundance=abundance,
         colormap=colormap,
         output="pathway.svg",
         title="Dopaminergic Pathway — Metabolite Abundance",
-        layout="dot",          # requires pygraphviz; falls back to kamada_kawai
+        positions=positions,
+        figsize=(14, 10),
     )
