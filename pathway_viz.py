@@ -1,130 +1,19 @@
 """
-pathway_viz.py — Visualize a metabolic/signaling pathway with abundance-colored nodes.
+pathway_viz.py — backward-compatible entry point for the pathway activity graph.
+
+The renderer now lives in :mod:`colorpath.illustration.pathway_graph` (reused by the
+decomposition engine). This module re-exports ``draw_pathway`` so existing imports and
+``python pathway_viz.py`` keep working, and retains the dopaminergic-pathway example.
 
 Usage:
     python pathway_viz.py
 
-Inputs (edit the EXAMPLE section at the bottom or import as a module):
-    pathway : list of (source, target) tuples describing directed edges
-    abundance: dict mapping node name -> numeric abundance value
-    colormap : matplotlib colormap name (e.g. 'viridis', 'RdYlGn', 'plasma')
-
-Output:
-    A vector SVG (and/or PDF) figure saved to disk.
+See ``demo_decomposition.py`` for the full decomposition -> illustration pipeline.
 """
 
-import matplotlib
-matplotlib.use("Agg")
+from colorpath.illustration import draw_pathway
 
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-import networkx as nx
-import numpy as np
-
-
-def draw_pathway(
-    pathway: list[tuple[str, str]],
-    abundance: dict[str, float],
-    colormap: str = "RdYlGn",
-    output: str = "pathway.svg",
-    title: str = "Pathway",
-    node_size: int = 2000,
-    font_size: int = 9,
-    figsize: tuple[float, float] = (10, 7),
-    layout: str = "dot",          # 'dot' (hierarchical) or 'spring' / 'kamada_kawai'
-    positions: dict[str, tuple[float, float]] | None = None,
-) -> None:
-    """
-    Draw a pathway graph with nodes colored by abundance.
-
-    Parameters
-    ----------
-    pathway   : list of (source, target) edge tuples
-    abundance : {node_name: value} — nodes missing from this dict are drawn grey
-    colormap  : matplotlib colormap name
-    output    : output file path (.svg or .pdf recommended for vector output)
-    title     : figure title
-    node_size : size of each node circle
-    font_size : label font size
-    figsize   : (width, height) in inches
-    layout    : graph layout algorithm
-    positions : optional dict {node: (x, y)} — overrides automatic layout
-    """
-    G = nx.DiGraph()
-    G.add_edges_from(pathway)
-
-    # Add any abundance nodes not already in the graph as isolated nodes
-    for node in abundance:
-        if node not in G:
-            G.add_node(node)
-
-    # --- Layout ---
-    if positions is not None:
-        pos = positions
-    elif layout == "dot":
-        try:
-            pos = nx.nx_agraph.graphviz_layout(G, prog="dot")
-        except Exception:
-            pos = nx.kamada_kawai_layout(G)
-    elif layout == "spring":
-        pos = nx.spring_layout(G, seed=42)
-    else:
-        pos = nx.kamada_kawai_layout(G)
-
-    # --- Color mapping ---
-    nodes = list(G.nodes())
-    values = [abundance.get(n, np.nan) for n in nodes]
-
-    known = [v for v in values if not np.isnan(v)]
-    vmin = min(known) if known else 0
-    vmax = max(known) if known else 1
-
-    cmap = matplotlib.colormaps[colormap]
-    norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-
-    node_colors = [
-        cmap(norm(v)) if not np.isnan(v) else (0.7, 0.7, 0.7, 1.0)
-        for v in values
-    ]
-
-    # --- Draw ---
-    fig, ax = plt.subplots(figsize=figsize)
-
-    nx.draw_networkx_edges(
-        G, pos, ax=ax,
-        arrows=True,
-        arrowsize=20,
-        edge_color="#555555",
-        width=1.5,
-        connectionstyle="arc3,rad=0.05",
-    )
-    nx.draw_networkx_nodes(
-        G, pos, ax=ax,
-        node_color=node_colors,
-        node_size=node_size,
-        linewidths=1.2,
-        edgecolors="#333333",
-    )
-    nx.draw_networkx_labels(
-        G, pos, ax=ax,
-        font_size=font_size,
-        font_weight="bold",
-    )
-
-    # Colorbar
-    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-    cbar.set_label("Abundance", fontsize=10)
-
-    ax.set_title(title, fontsize=13, fontweight="bold")
-    ax.axis("off")
-    fig.tight_layout()
-
-    fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
-    print(f"Saved: {output}")
-    plt.close(fig)
+__all__ = ["draw_pathway"]
 
 
 # ---------------------------------------------------------------------------
