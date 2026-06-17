@@ -32,7 +32,8 @@ from colorpath.decomposition import LinearNMF
 from colorpath.illustration import (
     CATECHOLAMINE_SEROTONIN_EDGES,
     CATECHOLAMINE_SEROTONIN_POSITIONS,
-    illustrate_component,
+    draw_pathway,
+    render_pathway_activity_image,
 )
 
 N_SHOW = 3      # number of leading components to illustrate
@@ -62,37 +63,35 @@ def main(parquet_path: str):
         if s > 0:
             U[:, k] /= s
             V[k] *= s
-    res.U, res.V = U, V
 
-    # --- Figure: montage of the first N_SHOW pathway activity images ---
-    fig, axes = plt.subplots(1, N_SHOW, figsize=(4 * N_SHOW, 6))
+    # --- One combined figure: for each of the first N_SHOW components, the pathway
+    #     activity image (top row) with its smaller pathway activity graph beneath. ---
+    fig, axes = plt.subplots(
+        2, N_SHOW, figsize=(6.0 * N_SHOW, 10),
+        gridspec_kw=dict(height_ratios=[1.15, 1.0], hspace=0.04, wspace=0.04),
+    )
     for k in range(N_SHOW):
-        img = np.full(Hg * Wg, np.nan)
-        img[pix] = U[:, k]
-        im = axes[k].imshow(img.reshape(Hg, Wg), cmap="magma", origin="upper")
         top = [mets[i] for i in np.argsort(V[k])[::-1][:3]]
-        axes[k].set_title(f"Component {k}\n" + ", ".join(top), fontsize=9)
-        axes[k].axis("off")
-        fig.colorbar(im, ax=axes[k], shrink=0.6)
-    fig.suptitle("01_pd_51 — pathway activity images (KL-NMF, K=5)", fontsize=12)
-    fig.tight_layout()
-    montage = os.path.join(figdir, "components_images.png")
-    fig.savefig(montage, dpi=120, bbox_inches="tight")
-    plt.close(fig)
-    print("wrote", montage)
-
-    # --- Per-component pathway activity graphs ---
-    for k in range(N_SHOW):
-        illustrate_component(
-            res, component=k, metabolite_names=mets,
-            pathway_edges=CATECHOLAMINE_SEROTONIN_EDGES,
-            image_shape=(Hg, Wg), pixel_index=pix,
-            positions=CATECHOLAMINE_SEROTONIN_POSITIONS,
-            graph_output=os.path.join(figdir, f"component{k}_graph.png"),
-            image_output=os.path.join(figdir, f"component{k}_image.png"),
-            graph_colormap="magma", image_colormap="magma",
-            graph_kwargs=dict(figsize=(18, 10), node_size=2400, font_size=9),
+        # top row: pathway activity image
+        render_pathway_activity_image(
+            scores=U[:, k], image_shape=(Hg, Wg), pixel_index=pix,
+            colormap="magma", ax=axes[0][k], colorbar=True, title_fontsize=11,
+            title=f"Component {k}\n" + ", ".join(top),
         )
+        # bottom row: smaller pathway activity graph
+        abundance = {m: float(V[k, j]) for j, m in enumerate(mets)}
+        draw_pathway(
+            pathway=CATECHOLAMINE_SEROTONIN_EDGES, abundance=abundance,
+            positions=CATECHOLAMINE_SEROTONIN_POSITIONS, colormap="magma",
+            node_size=300, font_size=5.5, ax=axes[1][k], colorbar=False,
+            title="", label_halo=True,
+        )
+    fig.suptitle("01_pd_51 — pathway activity image (top) and graph (bottom) per component "
+                 "(KL-NMF, K=5)", fontsize=13)
+    out = os.path.join(figdir, "components_overview.png")
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print("wrote", out)
 
     print("\nTop-5 metabolites per shown component:")
     for k in range(N_SHOW):

@@ -36,6 +36,9 @@ def draw_pathway(
     positions: dict[str, tuple[float, float]] | None = None,
     colorbar_label: str = "Abundance",
     label_halo: bool = True,
+    ax=None,
+    colorbar: bool = True,
+    title_fontsize: int = 13,
 ) -> None:
     """
     Draw a pathway graph with nodes colored by abundance.
@@ -45,16 +48,22 @@ def draw_pathway(
     pathway   : list of (source, target) edge tuples
     abundance : {node_name: value} — nodes missing from this dict are drawn grey
     colormap  : matplotlib colormap name
-    output    : output file path (.svg or .pdf recommended for vector output)
+    output    : output file path (.svg or .pdf recommended for vector output). Ignored
+                when ``ax`` is supplied.
     title     : figure title
     node_size : size of each node circle
     font_size : label font size
-    figsize   : (width, height) in inches
+    figsize   : (width, height) in inches (only when ``ax`` is None)
     layout    : graph layout algorithm
     positions : optional dict {node: (x, y)} — overrides automatic layout
     colorbar_label : label for the colour bar (e.g. a component's loading units)
     label_halo : draw a white outline around node labels so they stay legible on dark
                  (low-value) nodes; set False for the plain original style
+    ax        : optional matplotlib Axes to draw into; when given, the renderer draws onto
+                it and does not create, save, or close a figure (use this to compose
+                several components into one figure).
+    colorbar  : whether to attach a colour bar.
+    title_fontsize : title font size.
     """
     G = nx.DiGraph()
     G.add_edges_from(pathway)
@@ -94,7 +103,11 @@ def draw_pathway(
     ]
 
     # --- Draw ---
-    fig, ax = plt.subplots(figsize=figsize)
+    created = ax is None
+    if created:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
 
     nx.draw_networkx_edges(
         G, pos, ax=ax,
@@ -124,15 +137,17 @@ def draw_pathway(
             )
 
     # Colorbar
-    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
-    cbar.set_label(colorbar_label, fontsize=10)
+    if colorbar:
+        sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = fig.colorbar(sm, ax=ax, shrink=0.6, pad=0.02)
+        cbar.set_label(colorbar_label, fontsize=10)
 
-    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.set_title(title, fontsize=title_fontsize, fontweight="bold")
     ax.axis("off")
-    fig.tight_layout()
 
-    fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
-    print(f"Saved: {output}")
-    plt.close(fig)
+    if created:
+        fig.tight_layout()
+        fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
+        print(f"Saved: {output}")
+        plt.close(fig)

@@ -28,6 +28,9 @@ def render_pathway_activity_image(
     figsize: tuple[float, float] = (6, 5),
     pixel_index: np.ndarray | None = None,
     background: float = np.nan,
+    ax=None,
+    colorbar: bool = True,
+    title_fontsize: int = 13,
 ) -> None:
     """Render a component's per-pixel spatial score ``U[:, k]`` as a tissue heatmap.
 
@@ -36,15 +39,21 @@ def render_pathway_activity_image(
     scores      : (P,) spatial score for one component (a column of ``U``).
     image_shape : (height, width) of the acquisition grid. ``height * width`` must equal
                   ``P`` unless ``pixel_index`` is given.
-    output      : output path (.svg/.pdf for vector, .png for raster).
+    output      : output path (.svg/.pdf for vector, .png for raster). Ignored when ``ax``
+                  is supplied.
     title       : figure title.
     colormap    : matplotlib colormap name.
     colorbar_label : colour bar label.
-    figsize     : figure size in inches.
+    figsize     : figure size in inches (only when ``ax`` is None).
     pixel_index : optional (P,) integer flat indices placing each score on the grid when
                   pixels are a sparse/irregular subset of the full rectangle. Missing
                   grid cells are filled with ``background``.
     background  : value for grid cells with no measured pixel (NaN -> rendered blank).
+    ax          : optional matplotlib Axes to draw into; when given, the renderer draws
+                  onto it and does not create, save, or close a figure (use this to
+                  compose several components into one figure).
+    colorbar    : whether to attach a colour bar.
+    title_fontsize : title font size.
     """
     scores = np.asarray(scores, dtype=float).ravel()
     h, w = image_shape
@@ -64,15 +73,22 @@ def render_pathway_activity_image(
             )
         img = scores.reshape(h, w)
 
-    fig, ax = plt.subplots(figsize=figsize)
+    created = ax is None
+    if created:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
     im = ax.imshow(img, cmap=colormap, origin="upper", interpolation="nearest")
-    cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.02)
-    cbar.set_label(colorbar_label, fontsize=10)
-    ax.set_title(title, fontsize=13, fontweight="bold")
+    if colorbar:
+        cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.02)
+        cbar.set_label(colorbar_label, fontsize=10)
+    ax.set_title(title, fontsize=title_fontsize, fontweight="bold")
     ax.set_xticks([])
     ax.set_yticks([])
-    fig.tight_layout()
 
-    fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
-    print(f"Saved: {output}")
-    plt.close(fig)
+    if created:
+        fig.tight_layout()
+        fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
+        print(f"Saved: {output}")
+        plt.close(fig)
