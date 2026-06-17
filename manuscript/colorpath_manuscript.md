@@ -25,11 +25,9 @@ built around this distinction. Its primary route performs Itakura–Saito (IS) o
 Kullback–Leibler (KL) NMF in **linear** space, so each rank-1 component is literally a
 multiplicative outer product (coupling preserved) while a scale-invariant divergence
 supplies the multiplicative-error model (no log needed); detector saturation is handled by
-a masked loss that right-censors clipped entries. A secondary route reframes the same
-problem in `asinh`-transformed space with an equal-loading constraint, recovering crisp
-near-binary pathway membership. An optional kernel (HSIC) penalty further lets the
-components be driven toward ICA-style statistical (mutual-information) independence while
-remaining non-negative and multiplicative. On synthetic data with known structure the engine recovers
+a masked loss that right-censors clipped entries. An optional kernel (HSIC) penalty
+further lets the components be driven toward ICA-style statistical (mutual-information)
+independence while remaining non-negative and multiplicative. On synthetic data with known structure the engine recovers
 the planted pathways and the noise-model diagnostic selects the correct divergence. On a
 real catecholamine/serotonin MALDI-MSI section (7,730 pixels × 27 metabolites) the pipeline
 auto-selects the KL loss, decomposes the image into five spatially-distinct components
@@ -79,14 +77,12 @@ A linear factorisation of log-transformed data therefore studies the wrong objec
 even as the log was introduced to fix R1. Conversely, staying in linear space to keep R2
 intact leaves ordinary least squares mismatched to the multiplicative error of R1.
 
-`colorpath` resolves this rather than splitting the difference. Its primary route (§2.1)
-keeps the data in linear space — so the outer product is genuine multiplicative coupling
-(R2) — and obtains the multiplicative-error property (R1) from a **scale-invariant loss
-function** instead of from a transform. Its secondary route (§2.4) takes the opposite,
-log-side view: it accepts the additive-offset reframing and *constrains* the loadings to be
-equal across pathway members, so the single shared degree of freedom recovers
-multiplicative activity after exponentiation. The two routes bracket the design space and
-can be compared component-by-component.
+`colorpath` resolves this rather than splitting the difference. It keeps the data in
+linear space — so the outer product is genuine multiplicative coupling (R2) — and obtains
+the multiplicative-error property (R1) from a **scale-invariant loss function** (§2.1)
+instead of from a transform, satisfying both requirements simultaneously. On top of this
+fidelity term, an optional penalty (§2.4) can drive the components toward ICA-style
+statistical independence without leaving the non-negative, multiplicative model.
 
 ---
 
@@ -142,7 +138,7 @@ cleanly — a practical advantage of the linear route over a log+MSE pipeline, w
 first need an intermediate `asinh` transform under which neither the additive nor the
 multiplicative argument holds exactly. The mask is built from per-ion intensity histograms:
 a pile-up spike at a ceiling indicates hard clipping and is masked; a smoothly bending tail
-indicates soft compression and is left to the `asinh` route. Masking is **off by default**
+indicates soft compression and masking is optional. Masking is **off by default**
 and the engine warns when a pile-up is detected.
 
 **Optimisation.** We use multiplicative-update (MU) rules — Lee–Seung form for
@@ -173,22 +169,7 @@ with its primary-component image (i.e. a measurement nonlinearity, not co-locali
 (iv) A **component-recovery** check confirms that masking/IS collapses spurious compensating
 components relative to a Frobenius baseline.
 
-### 2.4 Route 1 (secondary): equal-loading constrained NMF in `asinh` space
-
-Route 2 fixes the pathway response exponent at 1 (members scale identically with activity).
-When the deliverable is instead crisp, near-binary **membership**, we factorise the
-variance-stabilised transform `Y = asinh(X/c)` — defined at zero, linear near the origin,
-logarithmic for large `x`, and absorbing soft saturation — as `Y ≈ Σ_k g_k ⊗ p_k`, while
-**constraining each loading `p_k` toward a sparse, equal-level vector**. This uses an
-elastic-net penalty plus a within-component equalisation step that shrinks the active
-(member) entries toward their common mean. The reframing of §1 makes this coherent: the
-shared multiplicative activity appears as an additive equal offset across members in
-transformed space, so a single equalised loading per component, after the inverse
-transform, recovers one multiplicative activity acting on all members. Route 1 is
-initialised from a Route 2 solution so the two share component identity and are directly
-comparable; its loadings are on the transformed, not linear, scale.
-
-### 2.5 ICA-style independent components: a mutual-information penalty
+### 2.4 ICA-style independent components: a mutual-information penalty
 
 Non-negative factorisation — including the IS/KL variant above — yields parts-based but
 generally *correlated* components; it does not impose the statistical **independence** that
@@ -259,11 +240,16 @@ elbow heuristic over `K ∈ {2,…,8}` selected **K = 5**.
 **Decomposition quality.** KL-NMF at `K = 5` (six restarts) reconstructed the image with a
 relative Frobenius error of **0.154**, i.e. roughly **85% of the signal energy** captured by
 five components. The components are spatially distinct, occupying different bands of the
-section rather than re-describing one dominant region (Figure 2). Their dominant metabolites
-(Table 1) are coherent: component 0 is serotonin-pathway–dominated (Serotonin, 5-HIAA)
-together with the high-abundance terminal catabolites HVA/MOPEGAL and 3-OMD; component 3 is a
-clean amine-catabolite group (DOPAC/DOPEGAL, Epinephrine/Normetanephrine, Metanephrine);
-component 4 is precursor-dominated (L-DOPA, 3-MT).
+section rather than re-describing one dominant region. This is clearest in the **first
+three components** (Figure 2, Figure 3): component 0 is serotonin-pathway–dominated
+(Serotonin, 5-HIAA) together with the high-abundance terminal catabolites HVA/MOPEGAL and
+3-OMD, and localises to the lower portion of the section; component 1 (DOPEG, 5-HIAA,
+HVA/MOPEGAL) is comparatively diffuse; and component 2 (3-OMD, MOPEG, 3-MT) concentrates in
+a distinct upper band, with 3-OMD by far its strongest loading (Figure 3, right). Their
+dominant metabolites (Table 1) are chemically coherent, and the later components continue
+the pattern: component 3 is a clean amine-catabolite group (DOPAC/DOPEGAL,
+Epinephrine/Normetanephrine, Metanephrine) and component 4 is precursor-dominated
+(L-DOPA, 3-MT).
 
 **An ambiguity surfaced by the data.** Three metabolite pairs — **DOPAC/DOPEGAL**,
 **HVA/MOPEGAL**, and **Epinephrine/Normetanephrine** — have *perfectly identical* intensity
@@ -288,7 +274,7 @@ their equal loadings reflect identical measured columns.)*
 
 ### 3.3 ICA-style independence
 
-We tested the independence penalty (§2.5) in two regimes. On a synthetic problem with two
+We tested the independence penalty (§2.4) in two regimes. On a synthetic problem with two
 strongly but *non-linearly* dependent non-negative sources (so they are nearly uncorrelated
 yet far from independent), plain KL-NMF recovered components with mean off-diagonal
 normalised HSIC of 0.18. Adding the penalty drove this toward zero monotonically with `λ`,
@@ -317,14 +303,33 @@ do not.
 
 ### 3.4 Figures
 
-- **Figure 1.** Method schematic: the error-model vs coupling-model tension and the two
-  routes that resolve it (linear-space IS/KL with masked loss; `asinh` equal-loading NMF).
-- **Figure 2.** `01_pd_51` decomposed into five KL-NMF pathway activity images, each on the
-  62 × 144 tissue grid, annotated with top-loading metabolites. *(Generated by the
-  pipeline; see `demo_decomposition.py` and the analysis in §3.2.)*
-- **Figure 3.** Full dual view for one component — pathway activity graph (loadings over the
-  catecholamine/serotonin network, hand-laid for legibility) beside its pathway activity
-  image. *(Generated by `illustrate_component`.)*
+**Figure 2. Pathway activity images of the first three components of `01_pd_51`.**
+Per-pixel spatial scores `U[:,k]` for components 0–2, placed back on the 62 × 144 tissue
+grid (KL-NMF, `K = 5`), annotated with their top-3 metabolites. The three components occupy
+distinct tissue domains — a lower band (component 0), a diffuse distribution (component 1),
+and an upper band (component 2).
+
+![Pathway activity images for components 0-2 of 01_pd_51](figures/components_images.png)
+
+**Figure 3. Pathway activity graphs of the first three components.** For each of components
+0–2, the spectral loading `V[k,:]` colours the catecholamine/serotonin reaction network
+(brighter = higher loading; layout hand-laid for legibility, labels haloed for contrast).
+Component 0 is led by Serotonin and the terminal catabolites HVA/MOPEGAL; component 1 by
+DOPEG and 5-HIAA; component 2 by 3-OMD. Generated by `illustrate_component`.
+
+*Component 0:*
+
+![Pathway activity graph, component 0](figures/component0_graph.png)
+
+*Component 1:*
+
+![Pathway activity graph, component 1](figures/component1_graph.png)
+
+*Component 2:*
+
+![Pathway activity graph, component 2](figures/component2_graph.png)
+
+All figures are regenerated from the source parquet by `manuscript/make_figures.py`.
 
 ---
 
@@ -334,7 +339,7 @@ do not.
 discards spatial adjacency; Fernsel [5] adds spatial coherence through a total-variation
 penalty, but as an orthogonal-NMF *clustering* method scored on segmentation metrics, not a
 pathway recovery method — a graph/TV penalty on the spatial factor is a natural optional
-extension to either route here, not part of the core. The "component → pathway" step is
+extension to the factorisation here, not part of the core. The "component → pathway" step is
 classically handled by annotate-then-enrich: Jones *et al.* [3] used HMDB pathway
 information to flag Warburg-effect regions, and Wittmann *et al.* (S2IsoMEr / METASPACE)
 [4] provide the methodologically central recent tool, bootstrapping over isomer/isobar
@@ -346,7 +351,7 @@ uncertainty. A known IMS confounder to flag in any downstream labelling is matri
 formation, which co-localises with parent metabolites and can populate a spatial factor with
 an adduct series rather than biology [6].
 
-**Independence without leaving the model.** The HSIC penalty (§2.5, §3.3) reconciles a
+**Independence without leaving the model.** The HSIC penalty (§2.4, §3.3) reconciles a
 second tension — between NMF's correlated parts and ICA's independent sources — without
 abandoning non-negativity or multiplicative coupling. Where prior MSI work either ran NMF
 *or* ICA (Siy et al. [1] compared them as alternatives), we obtain ICA-style MI-sense
@@ -357,9 +362,9 @@ a kernel-alignment diagnostic to certify the result.
 **Novelty, stated plainly.** The factorisation itself is not novel — IS/KL-NMF, masked
 NMF, and kernel independence contrasts are standard. The defensible methodological core is
 the **error-vs-coupling resolution**: modelling pathway co-regulation as multiplicative and
-matching it to a multiplicative error model (linear-space IS/KL; the equal-loading
-log-space reframing), which the default log-then-PCA pipeline gets wrong; the independence
-penalty is a clean, optional add-on rather than a separate algorithm. The likely publishable increment is the
+matching it to a multiplicative error model (linear-space IS/KL), which the default
+log-then-PCA pipeline gets wrong; the independence penalty is a clean, optional add-on
+rather than a separate algorithm. The likely publishable increment is the
 combination — coupling a multiplicatively-correct, saturation-aware factorisation to
 **bootstrapped, isomer-aware pathway enrichment** in which the enrichment ranking statistic
 *is* a component's loading vector (ranking ions by loading on spatial factor `k`). Existing
@@ -377,13 +382,14 @@ the spatial structure is robust to further iteration. (iii) `K` selection by an
 elbow heuristic is unstable in general; stability-based or cross-validated selection is
 preferable. (iv) Results are shown on one section and one synthetic dataset; spatial
 adjacency, multi-sample alignment, adduct confounding, and the full enrichment step remain
-to be evaluated. (v) Route 1's equal-loading constraint is currently a penalty-plus-
-equalisation heuristic rather than a single variational objective.
+to be evaluated. (v) The independence penalty's random-Fourier-feature bandwidth is fixed
+per iteration from the current factor, so its objective is only piecewise-deterministic
+across iterations.
 
 **Conclusion.** Posing IMS pathway decomposition as the joint satisfaction of a
 multiplicative coupling model and a multiplicative error model leads to a simple, coherent
-pipeline — linear-space IS/KL NMF with a censoring mask, paired with an equal-loading
-log-space alternative — that recovers known structure on synthetic data and produces
+pipeline — linear-space IS/KL NMF with a censoring mask, plus an optional ICA-style
+independence penalty — that recovers known structure on synthetic data and produces
 spatially distinct, chemically coherent components on real MALDI-MSI, while transparently
 exposing the isomer ambiguity that any honest pathway labelling must confront.
 
