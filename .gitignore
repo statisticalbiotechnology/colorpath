@@ -5,6 +5,18 @@ component_*_image.svg
 route2_component_*.svg
 route1_component_*.svg
 
+# LaTeX build artifacts (manuscript/ — the PDF is rebuilt via `make`)
+manuscript/main.pdf
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,7 +1,7 @@
 """
 make_figures.py — regenerate the manuscript figures from a MALDI-MSI parquet.
 
-Reproduces the `01_pd_51` results shown in `colorpath_manuscript.md`: a KL-NMF
+Reproduces the `01_pd_51` results shown in `main.tex`: a KL-NMF
 decomposition (K=5) and, for the first three components, the pathway activity image
 (spatial score on the tissue grid) and the pathway activity graph (loadings over the
 catecholamine/serotonin network).
