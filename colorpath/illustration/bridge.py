@@ -53,6 +53,8 @@ def illustrate_component(
     graph_colormap: str = "RdYlGn",
     image_colormap: str = "viridis",
     title_prefix: str = "Pathway component",
+    graph_kwargs: dict | None = None,
+    image_kwargs: dict | None = None,
 ) -> dict[str, str]:
     """Render both views of one decomposition component.
 
@@ -72,6 +74,12 @@ def illustrate_component(
     pixel_index      : optional flat pixel indices for an irregular grid.
     graph_colormap / image_colormap : colormaps for the two views.
     title_prefix     : prefix for both figure titles.
+    graph_kwargs     : extra keyword arguments forwarded to
+                       :func:`pathway_graph.draw_pathway` (e.g. ``figsize``,
+                       ``node_size``, ``font_size``, ``layout``).
+    image_kwargs     : extra keyword arguments forwarded to
+                       :func:`pathway_image.render_pathway_activity_image`
+                       (e.g. ``figsize``, ``background``).
 
     Returns
     -------
@@ -108,6 +116,7 @@ def illustrate_component(
         title=f"{title_prefix} {component} — activity graph",
         positions=positions,
         colorbar_label=units,
+        **(graph_kwargs or {}),
     )
     render_pathway_activity_image(
         scores=scores,
@@ -117,6 +126,7 @@ def illustrate_component(
         colormap=image_colormap,
         colorbar_label=units,
         pixel_index=pixel_index,
+        **(image_kwargs or {}),
     )
 
     return {"graph": graph_output, "image": image_output}

@@ -17,6 +17,7 @@ matplotlib.use("Agg")
 
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -34,6 +35,7 @@ def draw_pathway(
     layout: str = "dot",          # 'dot' (hierarchical) or 'spring' / 'kamada_kawai'
     positions: dict[str, tuple[float, float]] | None = None,
     colorbar_label: str = "Abundance",
+    label_halo: bool = True,
 ) -> None:
     """
     Draw a pathway graph with nodes colored by abundance.
@@ -51,6 +53,8 @@ def draw_pathway(
     layout    : graph layout algorithm
     positions : optional dict {node: (x, y)} — overrides automatic layout
     colorbar_label : label for the colour bar (e.g. a component's loading units)
+    label_halo : draw a white outline around node labels so they stay legible on dark
+                 (low-value) nodes; set False for the plain original style
     """
     G = nx.DiGraph()
     G.add_edges_from(pathway)
@@ -107,11 +111,17 @@ def draw_pathway(
         linewidths=1.2,
         edgecolors="#333333",
     )
-    nx.draw_networkx_labels(
+    labels = nx.draw_networkx_labels(
         G, pos, ax=ax,
         font_size=font_size,
         font_weight="bold",
     )
+    if label_halo:
+        # White outline keeps labels readable regardless of the node colour beneath.
+        for text in labels.values():
+            text.set_path_effects(
+                [path_effects.withStroke(linewidth=2.5, foreground="white")]
+            )
 
     # Colorbar
     sm = cm.ScalarMappable(cmap=cmap, norm=norm)

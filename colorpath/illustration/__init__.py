@@ -12,5 +12,15 @@ colorpath.illustration — the visualisation layer (pathway activity graph + ima
 from .pathway_graph import draw_pathway
 from .pathway_image import render_pathway_activity_image
 from .bridge import illustrate_component
+from .pathways import (
+    CATECHOLAMINE_SEROTONIN_EDGES,
+    CATECHOLAMINE_SEROTONIN_POSITIONS,
+)
 
-__all__ = ["draw_pathway", "render_pathway_activity_image", "illustrate_component"]
+__all__ = [
+    "draw_pathway",
+    "render_pathway_activity_image",
+    "illustrate_component",
+    "CATECHOLAMINE_SEROTONIN_EDGES",
+    "CATECHOLAMINE_SEROTONIN_POSITIONS",
+]
