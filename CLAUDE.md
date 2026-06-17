@@ -13,6 +13,7 @@ colorpath/
   decomposition/            # the factorisation engine (this is the analysis core)
     losses.py               # frobenius / kl / is divergences + masked variants
     nmf_linear.py           # Route 2 (PRIMARY): masked IS/KL NMF in linear space, MU + warm start
+    nmf_independent.py      # Route 2+: IS/KL NMF with an ICA-style HSIC independence penalty
     nmf_loglevel.py         # Route 1 (SECONDARY): asinh transform + equal-loading constrained NMF
     saturation.py           # detector-ceiling detection, mask construction, histograms
     diagnostics.py          # variance-vs-mean, compensation-artifact, recovery checks
@@ -142,6 +143,38 @@ few KL iterations** (`warm_start_iter`), floor by `EPS` to avoid division by zer
 
 **Outputs.** `U` (pathway activity images) and `V` (pathway activity graphs) on
 interpretable **linear-abundance** units, ready for the illustration layer.
+
+## 2b. Route 2+ (OPTIONAL): ICA-style independent components — `nmf_independent.py`
+
+Plain NMF (even with the IS/KL loss) leaves components **correlated**; it never enforces
+the statistical *independence* ICA targets. `IndependentNMF` adds independence while
+keeping both principles — it does **not** whiten/rotate (that would break non-negativity
+and the multiplicative outer product). It keeps the masked IS/KL fidelity term and adds a
+mutual-information penalty:
+
+```
+minimise_{U,V ≥ 0}   D_IS/KL(X ‖ UV)  +  λ · Σ_{i<j} HSIC(U[:,i], U[:,j])
+```
+
+**Why HSIC.** The Hilbert–Schmidt Independence Criterion with a *characteristic* (RBF)
+kernel is zero **iff** the two variables are independent (iff their mutual information is
+zero), so minimising it pushes components to MI-sense orthogonality. This is exactly the
+kernel dependence contrast of **Kernel ICA (Bach–Jordan 2002)**, used here as a penalty on
+the non-negative factor rather than as a rotation objective. A *linear* kernel
+(`kernel="linear"`) recovers plain second-order decorrelation only — **not** independence.
+
+**Implementation.** RBF HSIC and its gradient are approximated with **random Fourier
+features** (`n_features`), giving O(P·D) cost. Optimisation warm-starts from a plain Route
+2 fit, then alternates a masked-MU update for `V` with a **projected-gradient + Armijo**
+step for `U` on the deterministic (data + λ·penalty) objective. `λ` is **dimensionless**:
+the penalty gradient is rescaled to the data gradient's norm each step, so `λ=0` is plain
+Route 2 and `λ≈1` pushes independence about as hard as the data term. `target="U"`
+penalises the spatial maps (spatial-ICA analogue, default); `target="V"` the loadings.
+
+**Diagnostic.** `normalised_hsic_matrix` reports pairwise normalised HSIC (centred kernel
+alignment, ∈ [0,1]; 0 ≈ independent) using a direct RBF kernel — an *independent* check
+that the penalty achieved independence. Increasing `λ` trades a modest rise in
+reconstruction error for components whose off-diagonal dependence falls toward 0.
 
 ## 3. Route 1 (SECONDARY): equal-loading constrained log-space NMF — `nmf_loglevel.py`
 

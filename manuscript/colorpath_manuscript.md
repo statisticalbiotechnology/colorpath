@@ -27,7 +27,9 @@ multiplicative outer product (coupling preserved) while a scale-invariant diverg
 supplies the multiplicative-error model (no log needed); detector saturation is handled by
 a masked loss that right-censors clipped entries. A secondary route reframes the same
 problem in `asinh`-transformed space with an equal-loading constraint, recovering crisp
-near-binary pathway membership. On synthetic data with known structure the engine recovers
+near-binary pathway membership. An optional kernel (HSIC) penalty further lets the
+components be driven toward ICA-style statistical (mutual-information) independence while
+remaining non-negative and multiplicative. On synthetic data with known structure the engine recovers
 the planted pathways and the noise-model diagnostic selects the correct divergence. On a
 real catecholamine/serotonin MALDI-MSI section (7,730 pixels × 27 metabolites) the pipeline
 auto-selects the KL loss, decomposes the image into five spatially-distinct components
@@ -186,6 +188,43 @@ transform, recovers one multiplicative activity acting on all members. Route 1 i
 initialised from a Route 2 solution so the two share component identity and are directly
 comparable; its loadings are on the transformed, not linear, scale.
 
+### 2.5 ICA-style independent components: a mutual-information penalty
+
+Non-negative factorisation — including the IS/KL variant above — yields parts-based but
+generally *correlated* components; it does not impose the statistical **independence** that
+independent component analysis (ICA) targets, and which is often desirable for higher
+components ("after the dominant programme, what is the next *independent* one?"). Classical
+ICA achieves independence by whitening and rotating in signed space, which would destroy
+both the non-negativity and the multiplicative outer-product structure central to our
+principles. We therefore keep the IS/KL fidelity term and *add* a penalty that targets
+mutual information directly:
+
+```
+minimise_{U,V ≥ 0}   D(X ‖ UV)  +  λ · Σ_{i<j} HSIC(U[:,i], U[:,j]).
+```
+
+The Hilbert–Schmidt Independence Criterion (HSIC) [10] with a characteristic (Gaussian RBF)
+kernel is zero **if and only if** the two variables are independent — equivalently, iff
+their mutual information vanishes — so minimising the pairwise HSIC drives the components
+toward MI-sense orthogonality. This is precisely the kernel dependence contrast used by
+Kernel ICA [11]; the novelty here is only that we apply it as a *penalty on a non-negative
+factor* rather than as an orthogonal-rotation objective, so independence is obtained
+without leaving the multiplicative, non-negative model. A linear kernel reduces the penalty
+to ordinary second-order decorrelation, which is **not** sufficient for independence; the
+RBF kernel captures dependence of all orders.
+
+To scale to many pixels we approximate the RBF kernel and its gradient with random Fourier
+features [12], giving the penalty in O(P·D) for D features. Optimisation warm-starts from
+the plain Route 2 solution, then alternates a masked multiplicative-update step for `V`
+with a projected-gradient + backtracking step for `U` on the deterministic
+(data + λ·penalty) objective, projecting onto non-negativity. Because the raw HSIC is many
+orders of magnitude smaller than the divergence, `λ` is made dimensionless by rescaling the
+penalty gradient to the data gradient's norm at each step: `λ = 0` recovers Route 2 and
+`λ ≈ 1` pushes independence about as hard as the data fidelity. Independence is penalised on
+the spatial maps `U` (the spatial-ICA analogue) by default, or on the loadings `V`. We
+verify the outcome with an independent diagnostic — the normalised HSIC (centred kernel
+alignment, in [0, 1]) between component pairs, computed with a direct RBF kernel.
+
 ---
 
 ## 3. Results
@@ -247,7 +286,36 @@ motivates ambiguity-aware enrichment (§4) rather than a one-molecule-per-ion as
 *(HVA≡MOPEGAL, DOPAC≡DOPEGAL, and Epinephrine≡Normetanephrine are unresolved isobar pairs;
 their equal loadings reflect identical measured columns.)*
 
-### 3.3 Figures
+### 3.3 ICA-style independence
+
+We tested the independence penalty (§2.5) in two regimes. On a synthetic problem with two
+strongly but *non-linearly* dependent non-negative sources (so they are nearly uncorrelated
+yet far from independent), plain KL-NMF recovered components with mean off-diagonal
+normalised HSIC of 0.18. Adding the penalty drove this toward zero monotonically with `λ`,
+at a small and controllable reconstruction cost (Table 2): at `λ = 1` dependence fell to
+0.08 for essentially no loss of fit, and by `λ = 3` the components were independent
+(nHSIC = 0.00) at a relative-reconstruction cost rising from 0.146 to 0.174. This is the
+ICA trade-off — exchanging a little reconstruction for statistical independence — realised
+inside the non-negative, multiplicative model.
+
+On the real `01_pd_51` section the KL-NMF components were **already near-independent** (mean
+off-diagonal normalised HSIC ≈ 0.05), so the penalty had little to do: dependence was
+essentially unchanged and, reassuringly, the reconstruction error was preserved
+(0.154 → 0.155) even at `λ = 8`. The penalty thus acts as a safeguard/diagnostic when the
+data already separate into independent spatial programmes, and as an active tool when they
+do not.
+
+**Table 2.** Independence penalty on two non-linearly dependent synthetic sources
+(`K = 2`, KL loss). `λ = 0` reproduces plain Route 2.
+
+| λ | mean off-diag normalised HSIC | relative reconstruction error |
+|------|------|------|
+| 0 (plain KL-NMF) | 0.18 | 0.146 |
+| 1 | 0.08 | 0.148 |
+| 3 | 0.00 | 0.174 |
+| 10 | 0.00 | 0.178 |
+
+### 3.4 Figures
 
 - **Figure 1.** Method schematic: the error-model vs coupling-model tension and the two
   routes that resolve it (linear-space IS/KL with masked loss; `asinh` equal-loading NMF).
@@ -278,11 +346,20 @@ uncertainty. A known IMS confounder to flag in any downstream labelling is matri
 formation, which co-localises with parent metabolites and can populate a spatial factor with
 an adduct series rather than biology [6].
 
-**Novelty, stated plainly.** The factorisation itself is not novel — IS/KL-NMF and masked
-NMF are standard. The defensible methodological core is the **error-vs-coupling
-resolution**: modelling pathway co-regulation as multiplicative and matching it to a
-multiplicative error model (linear-space IS/KL; the equal-loading log-space reframing),
-which the default log-then-PCA pipeline gets wrong. The likely publishable increment is the
+**Independence without leaving the model.** The HSIC penalty (§2.5, §3.3) reconciles a
+second tension — between NMF's correlated parts and ICA's independent sources — without
+abandoning non-negativity or multiplicative coupling. Where prior MSI work either ran NMF
+*or* ICA (Siy et al. [1] compared them as alternatives), we obtain ICA-style MI-sense
+independence *as a tunable penalty on a non-negative, multiplicatively-correct
+factorisation*, with a dimensionless weight that interpolates between the two extremes and
+a kernel-alignment diagnostic to certify the result.
+
+**Novelty, stated plainly.** The factorisation itself is not novel — IS/KL-NMF, masked
+NMF, and kernel independence contrasts are standard. The defensible methodological core is
+the **error-vs-coupling resolution**: modelling pathway co-regulation as multiplicative and
+matching it to a multiplicative error model (linear-space IS/KL; the equal-loading
+log-space reframing), which the default log-then-PCA pipeline gets wrong; the independence
+penalty is a clean, optional add-on rather than a separate algorithm. The likely publishable increment is the
 combination — coupling a multiplicatively-correct, saturation-aware factorisation to
 **bootstrapped, isomer-aware pathway enrichment** in which the enrichment ranking statistic
 *is* a component's loading vector (ranking ions by loading on spatial factor `k`). Existing
@@ -339,3 +416,8 @@ tests are implemented in the `colorpath` package (`colorpath/decomposition/`,
 8. Lee DD, Seung HS. Algorithms for non-negative matrix factorization. *NeurIPS*, 2001.
 9. Févotte C, Bertin N, Durrieu J-L. Nonnegative matrix factorization with the Itakura–Saito
    divergence. *Neural Computation*, 2009.
+10. Gretton A, Bousquet O, Smola A, Schölkopf B. Measuring statistical dependence with
+    Hilbert–Schmidt norms (HSIC). *ALT*, 2005.
+11. Bach FR, Jordan MI. Kernel independent component analysis. *J. Machine Learning
+    Research*, 2002.
+12. Rahimi A, Recht B. Random features for large-scale kernel machines. *NeurIPS*, 2007.

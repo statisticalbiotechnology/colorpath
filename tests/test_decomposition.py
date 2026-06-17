@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from colorpath.decomposition import (
+    IndependentNMF,
     LinearNMF,
     LogLevelNMF,
     asinh_transform,
@@ -19,6 +20,7 @@ from colorpath.decomposition import (
     inverse_asinh,
     is_loss,
     kl_loss,
+    normalised_hsic_matrix,
     select_k,
     variance_vs_mean,
 )
@@ -210,3 +212,63 @@ def test_loglevel_warm_start_from_route2():
     r2 = LinearNMF(2, loss="is", random_state=0).fit(X)
     r1 = LogLevelNMF(2, random_state=0).fit(X, init=(r2.U, r2.V))
     assert r1.loss_curve[-1] <= r1.loss_curve[0] + 1e-6
+
+
+# ------------------------- independence (ICA-style) -------------------------
+
+def dependent_sources(P=800, M=14, seed=1, noise="mult"):
+    """Two strongly (nonlinearly) dependent non-negative spatial sources."""
+    rng = np.random.default_rng(seed)
+    t = rng.uniform(0, 3, P)
+    s1 = t + 0.2 * rng.gamma(2, 1, P)
+    s2 = (t - 1.5) ** 2 + 0.2 * rng.gamma(2, 1, P)  # dependent on t, ~uncorrelated
+    S = np.column_stack([s1, s2])
+    S = S - S.min(0) + 0.05
+    V = rng.random((2, M)) + 0.1
+    X = S @ V
+    if noise == "mult":
+        X = X * rng.gamma(40, 1 / 40, X.shape)
+    return X
+
+
+def _offdiag_mean(M):
+    return float(M[~np.eye(M.shape[0], dtype=bool)].mean())
+
+
+def test_normalised_hsic_independent_vs_dependent():
+    rng = np.random.default_rng(0)
+    a = rng.gamma(2, 1, 1500)
+    indep = np.column_stack([a, rng.gamma(2, 1, 1500)])
+    dep = np.column_stack([a, a**2 + 0.01 * rng.gamma(2, 1, 1500)])
+    assert _offdiag_mean(normalised_hsic_matrix(dep, random_state=0)) > \
+           _offdiag_mean(normalised_hsic_matrix(indep, random_state=0))
+
+
+def test_independent_nmf_lam0_matches_route2_quality():
+    X = dependent_sources()
+    r = IndependentNMF(2, loss="kl", lam=0.0, max_iter=80, random_state=0).fit(X)
+    assert np.all(r.U >= 0) and np.all(r.V >= 0)
+    rel = np.linalg.norm(r.reconstruct() - X) / np.linalg.norm(X)
+    assert rel < 0.3
+
+
+def test_independent_nmf_reduces_dependence():
+    X = dependent_sources()
+    base = IndependentNMF(2, loss="kl", lam=0.0, max_iter=120, inner_steps=2,
+                          random_state=0).fit(X)
+    indep = IndependentNMF(2, loss="kl", lam=5.0, max_iter=120, inner_steps=2,
+                           random_state=0).fit(X)
+    dep_base = _offdiag_mean(base.dependence_after)
+    dep_indep = _offdiag_mean(indep.dependence_after)
+    # The penalty should measurably lower MI-sense dependence.
+    assert dep_indep < dep_base - 0.02
+    # ...without destroying the reconstruction.
+    rel = np.linalg.norm(indep.reconstruct() - X) / np.linalg.norm(X)
+    assert rel < 0.4
+
+
+def test_independent_nmf_linear_kernel_runs():
+    X = dependent_sources()
+    r = IndependentNMF(2, loss="frobenius", lam=2.0, kernel="linear",
+                       max_iter=60, random_state=0).fit(X)
+    assert r.dependence_after.shape == (2, 2)

@@ -24,6 +24,12 @@ project CLAUDE.md):
 
 from .losses import LOSSES, frobenius_loss, is_loss, kl_loss, get_loss
 from .nmf_linear import LinearNMF, LinearNMFResult, fit_linear_nmf
+from .nmf_independent import (
+    IndependentNMF,
+    IndependentNMFResult,
+    fit_independent_nmf,
+    normalised_hsic_matrix,
+)
 from .nmf_loglevel import (
     LogLevelNMF,
     LogLevelNMFResult,
@@ -49,6 +55,9 @@ __all__ = [
     "LOSSES", "frobenius_loss", "is_loss", "kl_loss", "get_loss",
     # Route 2
     "LinearNMF", "LinearNMFResult", "fit_linear_nmf",
+    # Route 2 + ICA-style independence
+    "IndependentNMF", "IndependentNMFResult", "fit_independent_nmf",
+    "normalised_hsic_matrix",
     # Route 1
     "LogLevelNMF", "LogLevelNMFResult", "fit_loglevel_nmf",
     "asinh_transform", "inverse_asinh",
