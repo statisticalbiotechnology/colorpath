@@ -24,6 +24,7 @@ from colorpath.decomposition import (
     select_k,
     variance_vs_mean,
     variation_explained,
+    spatial_variation_explained,
 )
 from colorpath.decomposition.saturation import detect_saturation_ceiling
 
@@ -303,6 +304,25 @@ def test_variation_explained_max_normalize():
     rng = np.random.default_rng(3)
     F = variation_explained(rng.random((50, 3)), rng.random((3, 5)), normalize="max")
     assert np.allclose(F.max(axis=0), 1.0)
+
+
+def test_spatial_variation_explained_sums_to_one_per_pixel():
+    rng = np.random.default_rng(4)
+    U = rng.random((120, 3))
+    V = rng.random((3, 9))
+    G = spatial_variation_explained(U, V)
+    assert G.shape == (120, 3)               # (P, K)
+    assert np.all((G >= 0) & (G <= 1))
+    assert np.allclose(G.sum(axis=1), 1.0)   # each pixel's shares sum to 1
+
+
+def test_spatial_variation_explained_is_transpose_dual():
+    # Per-pixel share equals the metabolite-share of the transposed factorisation.
+    rng = np.random.default_rng(5)
+    U = rng.random((40, 3)) + 0.1
+    V = rng.random((3, 7)) + 0.1
+    G = spatial_variation_explained(U, V)
+    assert np.allclose(G, variation_explained(V.T, U.T).T)
 
 
 def test_independent_nmf_linear_kernel_runs():

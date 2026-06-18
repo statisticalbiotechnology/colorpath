@@ -73,3 +73,29 @@ def variation_explained(
     else:
         raise ValueError("normalize must be 'sum' or 'max'")
     return contrib / np.maximum(denom, EPS)
+
+
+def spatial_variation_explained(
+    U: np.ndarray,
+    V: np.ndarray,
+    mode: str = "variance",
+    normalize: str = "sum",
+) -> np.ndarray:
+    """Per-pixel fraction of variation explained by each component.
+
+    The spatial analogue of :func:`variation_explained`, obtained by swapping the roles of
+    pixels and metabolites: for pixel ``p``, the across-metabolite variation of component
+    ``k``'s rank-1 contribution is ``U[p, k]^2 * Var_m(V[k, :])``, normalised per pixel,
+
+        G[p, k] = U[p, k]^2 * w_k  /  sum_k' ( U[p, k']^2 * w_k' ),   w_k = Var_m(V[k, :]).
+
+    Returns
+    -------
+    G : (P, K) array in ``[0, 1]``; with ``normalize="sum"`` each pixel's row sums to 1.
+        ``G[:, k]`` is the per-pixel share map for component ``k`` and can be rendered with
+        :func:`colorpath.illustration.render_pathway_activity_image` directly.
+    """
+    return variation_explained(
+        np.asarray(V, dtype=float).T, np.asarray(U, dtype=float).T,
+        mode=mode, normalize=normalize,
+    ).T

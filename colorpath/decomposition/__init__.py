@@ -49,7 +49,7 @@ from .diagnostics import (
     variance_vs_mean,
 )
 from .selection import KSelectionResult, select_k
-from .contributions import variation_explained
+from .contributions import variation_explained, spatial_variation_explained
 
 __all__ = [
     # losses
@@ -70,5 +70,5 @@ __all__ = [
     # selection
     "KSelectionResult", "select_k",
     # interpretation / illustration scaling
-    "variation_explained",
+    "variation_explained", "spatial_variation_explained",
 ]
