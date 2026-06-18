@@ -177,12 +177,28 @@ interpretable linear-abundance units.
 \subsection{Illustration layer}
 \label{sec:illustration}
 
-Each fitted component is rendered as the two objects above. The pathway activity graph
-colours a metabolite-reaction network by $V_{k,:}$; the pathway activity image reshapes
-$U_{:,k}$ onto the acquisition grid as a heatmap, supporting non-rectangular tissue through
-an explicit pixel-index map. A single bridge call (\code{illustrate\_component}) produces
-both views from a fitted result, so the decomposition and visualisation layers are decoupled
-but composable.
+Each fitted component is rendered as the two objects above. The pathway activity image
+reshapes $U_{:,k}$ onto the acquisition grid as a heatmap, supporting non-rectangular tissue
+through an explicit pixel-index map. The pathway activity graph colours a metabolite-reaction
+network; colouring nodes by the raw loading $V_{k,:}$ is uninformative because metabolite
+concentrations span several orders of magnitude, so a handful of abundant ions saturate the
+colour scale and the rest appear uniformly dark. We instead colour each metabolite by the
+\emph{fraction of its own variation that the component explains},
+\begin{equation}
+  F_{k,m} \;=\; \frac{V_{k,m}^2\,\operatorname{Var}_p\!\big(U_{:,k}\big)}
+                     {\sum_{k'} V_{k',m}^2\,\operatorname{Var}_p\!\big(U_{:,k'}\big)}
+            \;\in[0,1],
+  \label{eq:explained}
+\end{equation}
+the variance of component $k$'s rank-1 contribution $U_{:,k}V_{k,m}$ to metabolite $m$,
+normalised per metabolite so that the columns sum to one over components. The product
+$V_{k,m}\lVert U_{:,k}\rVert$ is invariant to the NMF scale ambiguity, so $F_{k,m}$ is well
+defined; it places every metabolite on a common $[0,1]$ scale, so a low-abundance ion
+``owned'' by a component reads as brightly as an abundant one. (As the components are not
+orthogonal, $F$ is a normalised share rather than an exact variance partition, exact in the
+independent-component limit of Section~\ref{sec:independence}.) A single bridge call
+(\code{illustrate\_component}) produces both views from a fitted result, so the decomposition
+and visualisation layers are decoupled but composable.
 
 \subsection{Diagnostics}
 \label{sec:diagnostics}
@@ -357,9 +373,12 @@ as an active tool when they do not.
   components 0--2, placed back on the $62 \times 144$ tissue grid (KL-NMF, $K = 5$) and
   titled with the component's top-3 metabolites --- the three components occupy distinct
   tissue domains (a lower band, a diffuse distribution, and an upper band). Bottom row,
-  directly beneath each image: the matching spectral loading $V_{k,:}$ colouring the
-  catecholamine/serotonin reaction network (brighter $=$ higher loading; hand-laid layout,
-  labels haloed for contrast). Regenerate from the source parquet with
+  directly beneath each image: the matching pathway activity graph over the
+  catecholamine/serotonin reaction network, with each metabolite coloured by the fraction
+  $F_{k,m}\in[0,1]$ of its variation explained by the component (Equation~\ref{eq:explained}) rather than by
+  the raw loading; this removes the concentration imbalance that otherwise renders the
+  colouring near-binary (hand-laid layout, labels haloed for contrast). Regenerate from the
+  source parquet with
   \code{python manuscript/make\_figures.py <parquet>}.}
   \label{fig:overview}
 \end{figure}

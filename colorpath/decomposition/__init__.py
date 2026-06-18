@@ -49,6 +49,7 @@ from .diagnostics import (
     variance_vs_mean,
 )
 from .selection import KSelectionResult, select_k
+from .contributions import variation_explained
 
 __all__ = [
     # losses
@@ -68,4 +69,6 @@ __all__ = [
     "compensation_artifact_check", "component_recovery",
     # selection
     "KSelectionResult", "select_k",
+    # interpretation / illustration scaling
+    "variation_explained",
 ]

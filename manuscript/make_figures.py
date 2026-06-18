@@ -28,7 +28,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from colorpath.decomposition import LinearNMF
+from colorpath.decomposition import LinearNMF, variation_explained
 from colorpath.illustration import (
     CATECHOLAMINE_SEROTONIN_EDGES,
     CATECHOLAMINE_SEROTONIN_POSITIONS,
@@ -56,6 +56,10 @@ def main(parquet_path: str):
     rel = np.linalg.norm(res.reconstruct() - X) / np.linalg.norm(X)
     print(f"KL-NMF K={K}: relative reconstruction error = {rel:.3f}")
 
+    # Per-metabolite fraction of variation explained by each component (scale-invariant,
+    # so it is computed from the raw fit before any cosmetic renormalisation).
+    F = variation_explained(res.U, res.V)            # (K, M) in [0, 1]
+
     # Normalise each component (unit-max spatial map; scale folded into loadings).
     U, V = res.U.copy(), res.V.copy()
     for k in range(K):
@@ -78,13 +82,14 @@ def main(parquet_path: str):
             colormap="magma", ax=axes[0][k], colorbar=True, title_fontsize=11,
             title=f"Component {k}\n" + ", ".join(top),
         )
-        # bottom row: smaller pathway activity graph
-        abundance = {m: float(V[k, j]) for j, m in enumerate(mets)}
+        # bottom row: smaller pathway activity graph, coloured by the per-metabolite
+        # fraction of variation this component explains (0-1), not the raw loading.
+        abundance = {m: float(F[k, j]) for j, m in enumerate(mets)}
         draw_pathway(
             pathway=CATECHOLAMINE_SEROTONIN_EDGES, abundance=abundance,
             positions=CATECHOLAMINE_SEROTONIN_POSITIONS, colormap="magma",
             node_size=300, font_size=5.5, ax=axes[1][k], colorbar=False,
-            title="", label_halo=True,
+            title="", label_halo=True, vmin=0.0, vmax=1.0,
         )
     fig.suptitle("01_pd_51 — pathway activity image (top) and graph (bottom) per component "
                  "(KL-NMF, K=5)", fontsize=13)

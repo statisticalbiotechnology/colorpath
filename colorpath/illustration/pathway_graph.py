@@ -39,6 +39,8 @@ def draw_pathway(
     ax=None,
     colorbar: bool = True,
     title_fontsize: int = 13,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> None:
     """
     Draw a pathway graph with nodes colored by abundance.
@@ -64,6 +66,8 @@ def draw_pathway(
                 several components into one figure).
     colorbar  : whether to attach a colour bar.
     title_fontsize : title font size.
+    vmin, vmax : fix the colour-scale limits (e.g. 0 and 1 for a fraction); when None they
+                 are taken from the data range.
     """
     G = nx.DiGraph()
     G.add_edges_from(pathway)
@@ -91,8 +95,10 @@ def draw_pathway(
     values = [abundance.get(n, np.nan) for n in nodes]
 
     known = [v for v in values if not np.isnan(v)]
-    vmin = min(known) if known else 0
-    vmax = max(known) if known else 1
+    if vmin is None:
+        vmin = min(known) if known else 0
+    if vmax is None:
+        vmax = max(known) if known else 1
 
     cmap = matplotlib.colormaps[colormap]
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)

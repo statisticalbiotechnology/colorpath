@@ -73,7 +73,12 @@ Each rank-1 component `U[:,k] ⊗ V[k,:]` is interpreted as a **pathway**:
 - `U[:,k]` — the **pathway activity image** (where in the tissue the pathway is active) →
   `colorpath.illustration.render_pathway_activity_image`.
 
-`illustrate_component` renders both from a fitted result. The factorisation must satisfy
+`illustrate_component` renders both from a fitted result. Because metabolite concentrations
+span orders of magnitude, colouring graph nodes by the raw loading `V[k,:]` looks near-binary
+(a few abundant ions saturate the scale); pass `graph_value="explained"` to colour each
+metabolite instead by the **fraction of its variation the component explains**
+(`decomposition.variation_explained`: `V[k,m]²·Var_p(U[:,k])` normalised per metabolite,
+∈[0,1], scale-invariant). The factorisation must satisfy
 two properties the conventional PCA/ICA/NNMF (or "log-then-PCA") baseline does **not**.
 
 ### 1.1 The two requirements that drive the design

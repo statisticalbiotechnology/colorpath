@@ -20,6 +20,7 @@ from typing import Sequence
 
 import numpy as np
 
+from ..decomposition.contributions import variation_explained
 from .pathway_graph import draw_pathway
 from .pathway_image import render_pathway_activity_image
 
@@ -53,6 +54,7 @@ def illustrate_component(
     graph_colormap: str = "RdYlGn",
     image_colormap: str = "viridis",
     title_prefix: str = "Pathway component",
+    graph_value: str = "loading",
     graph_kwargs: dict | None = None,
     image_kwargs: dict | None = None,
 ) -> dict[str, str]:
@@ -74,6 +76,11 @@ def illustrate_component(
     pixel_index      : optional flat pixel indices for an irregular grid.
     graph_colormap / image_colormap : colormaps for the two views.
     title_prefix     : prefix for both figure titles.
+    graph_value      : what the graph nodes encode. ``"loading"`` (default) colours by the
+                       raw loading ``V[k, :]`` (linear-abundance units); ``"explained"``
+                       colours by the per-metabolite fraction of variation explained by the
+                       component (:func:`variation_explained`), in [0, 1] — this removes the
+                       concentration imbalance that makes the raw loading look near-binary.
     graph_kwargs     : extra keyword arguments forwarded to
                        :func:`pathway_graph.draw_pathway` (e.g. ``figsize``,
                        ``node_size``, ``font_size``, ``layout``).
@@ -100,10 +107,21 @@ def illustrate_component(
             f"metabolite_names has {len(metabolite_names)} entries but V has {M} columns"
         )
 
-    loading = Vmat[component, :]
     scores = Umat[:, component]
 
-    abundance = {name: float(loading[j]) for j, name in enumerate(metabolite_names)}
+    if graph_value == "explained":
+        F = variation_explained(Umat, Vmat)          # (K, M) in [0, 1]
+        node_values = F[component, :]
+        graph_units = "fraction of variation explained"
+        vlim = dict(vmin=0.0, vmax=1.0)
+    elif graph_value == "loading":
+        node_values = Vmat[component, :]
+        graph_units = units
+        vlim = {}
+    else:
+        raise ValueError("graph_value must be 'loading' or 'explained'")
+
+    abundance = {name: float(node_values[j]) for j, name in enumerate(metabolite_names)}
 
     graph_output = graph_output or f"component_{component}_graph.svg"
     image_output = image_output or f"component_{component}_image.svg"
@@ -115,7 +133,8 @@ def illustrate_component(
         output=graph_output,
         title=f"{title_prefix} {component} — activity graph",
         positions=positions,
-        colorbar_label=units,
+        colorbar_label=graph_units,
+        **vlim,
         **(graph_kwargs or {}),
     )
     render_pathway_activity_image(

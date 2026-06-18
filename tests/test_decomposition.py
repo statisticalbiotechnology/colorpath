@@ -23,6 +23,7 @@ from colorpath.decomposition import (
     normalised_hsic_matrix,
     select_k,
     variance_vs_mean,
+    variation_explained,
 )
 from colorpath.decomposition.saturation import detect_saturation_ceiling
 
@@ -265,6 +266,43 @@ def test_independent_nmf_reduces_dependence():
     # ...without destroying the reconstruction.
     rel = np.linalg.norm(indep.reconstruct() - X) / np.linalg.norm(X)
     assert rel < 0.4
+
+
+def test_variation_explained_sums_to_one_per_metabolite():
+    rng = np.random.default_rng(0)
+    U = rng.random((100, 3))
+    V = rng.random((3, 8))
+    F = variation_explained(U, V, normalize="sum")
+    assert F.shape == (3, 8)
+    assert np.all((F >= 0) & (F <= 1))
+    assert np.allclose(F.sum(axis=0), 1.0)
+
+
+def test_variation_explained_scale_invariant():
+    rng = np.random.default_rng(1)
+    U = rng.random((80, 3)) + 0.1
+    V = rng.random((3, 6)) + 0.1
+    F = variation_explained(U, V)
+    # NMF scale ambiguity: U[:,k]*c, V[k,:]/c must leave the fractions unchanged.
+    c = np.array([5.0, 0.2, 3.0])
+    F2 = variation_explained(U * c, V / c[:, None])
+    assert np.allclose(F, F2)
+
+
+def test_variation_explained_removes_concentration_imbalance():
+    # One metabolite is 1000x more abundant but is "owned" by component 1, not 0.
+    U = np.abs(np.random.default_rng(2).standard_normal((200, 2))) + 0.05
+    V = np.array([[1.0, 0.0], [0.0, 1000.0]])  # m0 -> comp0, m1 -> comp1 (high conc.)
+    F = variation_explained(U, V)
+    # Despite m1's huge loading, component 0 explains ~none of its variation.
+    assert F[0, 1] < 0.05 and F[1, 1] > 0.95
+    assert F[0, 0] > 0.95
+
+
+def test_variation_explained_max_normalize():
+    rng = np.random.default_rng(3)
+    F = variation_explained(rng.random((50, 3)), rng.random((3, 5)), normalize="max")
+    assert np.allclose(F.max(axis=0), 1.0)
 
 
 def test_independent_nmf_linear_kernel_runs():
