@@ -1,10 +1,11 @@
 """
 make_figures.py — regenerate the manuscript figures from a MALDI-MSI parquet.
 
-Reproduces the `01_pd_51` results shown in `main.tex`: a KL-NMF
-decomposition (K=5) and, for the first three components, the pathway activity image
-(spatial score on the tissue grid) and the pathway activity graph (loadings over the
-catecholamine/serotonin network).
+Reproduces the `01_pd_51` results shown in `main.tex`: a KL-NMF decomposition (K=5) and,
+for the first three components, three views — the raw activity score U[:,k], the per-pixel
+spatial fraction of variation explained G[:,k], and the pathway graph coloured by the
+per-metabolite fraction of variation explained F[k,:] over the catecholamine/serotonin
+network.
 
 Usage:
     python manuscript/make_figures.py /path/to/01_pd_51_raw_by_metabolite_5ppm.parquet
@@ -28,7 +29,11 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from colorpath.decomposition import LinearNMF, variation_explained
+from colorpath.decomposition import (
+    LinearNMF,
+    spatial_variation_explained,
+    variation_explained,
+)
 from colorpath.illustration import (
     CATECHOLAMINE_SEROTONIN_EDGES,
     CATECHOLAMINE_SEROTONIN_POSITIONS,
@@ -56,11 +61,12 @@ def main(parquet_path: str):
     rel = np.linalg.norm(res.reconstruct() - X) / np.linalg.norm(X)
     print(f"KL-NMF K={K}: relative reconstruction error = {rel:.3f}")
 
-    # Per-metabolite fraction of variation explained by each component (scale-invariant,
-    # so it is computed from the raw fit before any cosmetic renormalisation).
+    # Fraction-of-variation-explained quantities (scale-invariant, so computed from the
+    # raw fit). F is per-metabolite (graph); G is per-pixel (spatial map).
     F = variation_explained(res.U, res.V)            # (K, M) in [0, 1]
+    G = spatial_variation_explained(res.U, res.V)    # (P, K) in [0, 1]
 
-    # Normalise each component (unit-max spatial map; scale folded into loadings).
+    # Display-normalise the raw activity maps (unit max) for the top row.
     U, V = res.U.copy(), res.V.copy()
     for k in range(K):
         s = U[:, k].max()
@@ -68,33 +74,50 @@ def main(parquet_path: str):
             U[:, k] /= s
             V[k] *= s
 
-    # --- One combined figure: for each of the first N_SHOW components, the pathway
-    #     activity image (top row) with its smaller pathway activity graph beneath. ---
+    # --- One combined figure, three rows per component: (1) raw activity score, (2) the
+    #     per-pixel spatial fraction of variation explained, (3) the pathway graph coloured
+    #     by the per-metabolite fraction of variation explained. Rows 1 and 2/3 mean
+    #     different things and are deliberately both shown (see the manuscript). ---
     fig, axes = plt.subplots(
-        2, N_SHOW, figsize=(6.0 * N_SHOW, 10),
-        gridspec_kw=dict(height_ratios=[1.15, 1.0], hspace=0.04, wspace=0.04),
+        3, N_SHOW, figsize=(6.0 * N_SHOW, 14),
+        gridspec_kw=dict(height_ratios=[1.0, 1.0, 0.95], hspace=0.06, wspace=0.05),
     )
+    rowlab = [
+        "activity score  $U_{:,k}$\n(max-normalised)",
+        "spatial fraction\nexplained  $G_{:,k}$",
+        "graph: fraction\nexplained  $F_{k,:}$",
+    ]
     for k in range(N_SHOW):
         top = [mets[i] for i in np.argsort(V[k])[::-1][:3]]
-        # top row: pathway activity image
+        # row 0: raw activity score (where the component is active)
         render_pathway_activity_image(
             scores=U[:, k], image_shape=(Hg, Wg), pixel_index=pix,
             colormap="magma", ax=axes[0][k], colorbar=True, title_fontsize=11,
-            title=f"Component {k}\n" + ", ".join(top),
+            colorbar_label="activity (norm.)", title=f"Component {k}\n" + ", ".join(top),
         )
-        # bottom row: smaller pathway activity graph, coloured by the per-metabolite
-        # fraction of variation this component explains (0-1), not the raw loading.
+        # row 1: per-pixel fraction of variation explained (where it dominates)
+        render_pathway_activity_image(
+            scores=G[:, k], image_shape=(Hg, Wg), pixel_index=pix,
+            colormap="magma", ax=axes[1][k], colorbar=True,
+            colorbar_label="fraction explained", title="",
+        )
+        # row 2: pathway graph coloured by per-metabolite fraction of variation explained
         abundance = {m: float(F[k, j]) for j, m in enumerate(mets)}
         draw_pathway(
             pathway=CATECHOLAMINE_SEROTONIN_EDGES, abundance=abundance,
             positions=CATECHOLAMINE_SEROTONIN_POSITIONS, colormap="magma",
-            node_size=300, font_size=5.5, ax=axes[1][k], colorbar=False,
+            node_size=300, font_size=5.5, ax=axes[2][k], colorbar=False,
             title="", label_halo=True, vmin=0.0, vmax=1.0,
         )
-    fig.suptitle("01_pd_51 — pathway activity image (top) and graph (bottom) per component "
-                 "(KL-NMF, K=5)", fontsize=13)
+    for r in range(3):
+        axes[r][0].text(
+            -0.16, 0.5, rowlab[r], transform=axes[r][0].transAxes,
+            rotation=90, va="center", ha="center", fontsize=11, fontweight="bold",
+        )
+    fig.suptitle("01_pd_51 — activity score, spatial fraction explained, and graph "
+                 "fraction explained per component (KL-NMF, K=5)", fontsize=13)
     out = os.path.join(figdir, "components_overview.png")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
+    fig.savefig(out, dpi=170, bbox_inches="tight")
     plt.close(fig)
     print("wrote", out)
 

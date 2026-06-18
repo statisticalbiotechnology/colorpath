@@ -196,9 +196,30 @@ $V_{k,m}\lVert U_{:,k}\rVert$ is invariant to the NMF scale ambiguity, so $F_{k,
 defined; it places every metabolite on a common $[0,1]$ scale, so a low-abundance ion
 ``owned'' by a component reads as brightly as an abundant one. (As the components are not
 orthogonal, $F$ is a normalised share rather than an exact variance partition, exact in the
-independent-component limit of Section~\ref{sec:independence}.) A single bridge call
-(\code{illustrate\_component}) produces both views from a fitted result, so the decomposition
-and visualisation layers are decoupled but composable.
+independent-component limit of Section~\ref{sec:independence}.)
+
+The same construction has a spatial dual, obtained by swapping the roles of pixels and
+metabolites: the per-pixel fraction of variation that component $k$ explains is
+\begin{equation}
+  G_{p,k} \;=\; \frac{U_{p,k}^2\,\operatorname{Var}_m\!\big(V_{k,:}\big)}
+                     {\sum_{k'} U_{p,k'}^2\,\operatorname{Var}_m\!\big(V_{k',:}\big)}
+            \;\in[0,1],
+  \label{eq:spatial-explained}
+\end{equation}
+with each pixel's shares summing to one over components.
+
+\paragraph{Two complementary spatial readings.} The raw activity image $U_{:,k}$ and the
+spatial fraction-explained image $G_{:,k}$ answer \emph{different} questions and are both
+worth showing. $U_{:,k}$ is the component's absolute activity --- \emph{where the pathway is
+active}; $G_{:,k}$ is the component's \emph{local share} of the signal --- \emph{where it
+dominates the variation}, after discounting pixels where a more active component also fires.
+They are not interchangeable: a component that is broadly but weakly active has a diffuse
+$U_{:,k}$ yet a sharp $G_{:,k}$ confined to the region it actually controls, while a region
+of high absolute activity that is co-explained by several components is bright in $U$ but
+only moderate in $G$. We therefore present both, alongside the graph fraction-explained
+$F_{k,:}$ (the per-metabolite analogue of $G$). A single bridge call
+(\code{illustrate\_component}) produces the graph and image views from a fitted result, so
+the decomposition and visualisation layers are decoupled but composable.
 
 \subsection{Diagnostics}
 \label{sec:diagnostics}
@@ -298,6 +319,37 @@ pattern: component~3 is a clean amine-catabolite group (DOPAC/DOPEGAL,
 Epinephrine/Normetanephrine, Metanephrine) and component~4 is precursor-dominated
 (L-DOPA, 3-MT).
 
+The two spatial readings of Section~\ref{sec:illustration} are complementary here rather than
+redundant (Figure~\ref{fig:overview}, top two rows). Component~1 is the clearest case: its raw
+activity $U_{:,1}$ is broad and low-contrast across much of the section, but its
+fraction-explained map $G_{:,1}$ sharpens to the mid-section territory it actually dominates,
+once the lower band (owned by component~0) and the upper band (component~2) are discounted.
+Conversely, the high-activity lower band of component~0 remains the region it both occupies
+and dominates, so $U_{:,0}$ and $G_{:,0}$ largely agree. Presenting both therefore separates
+``where a pathway is active'' from ``where it accounts for the local signal,'' which a single
+map conflates.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/components_overview.png}
+  \caption{\textbf{First three components of \code{01\_pd\_51}: three complementary views per
+  component.} \emph{Row 1 --- activity score:} the per-pixel score $U_{:,k}$ for components
+  0--2, placed back on the $62 \times 144$ tissue grid (KL-NMF, $K = 5$) and titled with the
+  component's top-3 metabolites; this shows \emph{where the pathway is active}. \emph{Row 2
+  --- spatial fraction explained:} the per-pixel share $G_{:,k}\in[0,1]$
+  (Equation~\ref{eq:spatial-explained}); this shows \emph{where the component dominates the
+  local signal}, sharpening diffuse activity (clearest for component~1) to the territory it
+  actually controls. \emph{Row 3 --- graph fraction explained:} the pathway activity graph
+  over the catecholamine/serotonin reaction network, with each metabolite coloured by the
+  fraction $F_{k,m}\in[0,1]$ of its variation explained by the component
+  (Equation~\ref{eq:explained}) rather than by the raw loading, which removes the
+  concentration imbalance that otherwise renders the colouring near-binary (hand-laid layout,
+  labels haloed for contrast). Rows~1 and~2 are deliberately both shown because they answer
+  different questions (Section~\ref{sec:illustration}). Regenerate from the source parquet
+  with \code{python manuscript/make\_figures.py <parquet>}.}
+  \label{fig:overview}
+\end{figure}
+
 \paragraph{An ambiguity surfaced by the data.} Three metabolite pairs ---
 \textbf{DOPAC/DOPEGAL}, \textbf{HVA/MOPEGAL}, and \textbf{Epinephrine/Normetanephrine} ---
 have \emph{perfectly identical} intensity columns and therefore always co-load on the same
@@ -364,24 +416,6 @@ as an active tool when they do not.
     \bottomrule
   \end{tabular}
 \end{table}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\textwidth]{figures/components_overview.png}
-  \caption{\textbf{First three components of \code{01\_pd\_51}: pathway activity image (top)
-  and graph (bottom) per component.} Top row: the per-pixel spatial score $U_{:,k}$ for
-  components 0--2, placed back on the $62 \times 144$ tissue grid (KL-NMF, $K = 5$) and
-  titled with the component's top-3 metabolites --- the three components occupy distinct
-  tissue domains (a lower band, a diffuse distribution, and an upper band). Bottom row,
-  directly beneath each image: the matching pathway activity graph over the
-  catecholamine/serotonin reaction network, with each metabolite coloured by the fraction
-  $F_{k,m}\in[0,1]$ of its variation explained by the component (Equation~\ref{eq:explained}) rather than by
-  the raw loading; this removes the concentration imbalance that otherwise renders the
-  colouring near-binary (hand-laid layout, labels haloed for contrast). Regenerate from the
-  source parquet with
-  \code{python manuscript/make\_figures.py <parquet>}.}
-  \label{fig:overview}
-\end{figure}
 
 \section{Discussion}
 \label{sec:discussion}
