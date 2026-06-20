@@ -22,9 +22,13 @@ colorpath/
     pathway_graph.py        # draw_pathway: metabolite network coloured by a loading vector
     pathway_image.py        # render_pathway_activity_image: spatial score -> tissue heatmap
     bridge.py               # illustrate_component: one component -> both views
+  spatial.py                # spatial-transcriptomics (Visium/HD) I/O: load export, gene-set
+                            #   select, per-gene scale, grid index, co-expression edges (reuses engine)
 pathway_viz.py              # backward-compatible shim (re-exports draw_pathway) + dopamine example
 demo_decomposition.py       # end-to-end synthetic pipeline (diagnostics -> Route 2 -> illustrate -> Route 1)
+demo_visium_plasma.py       # end-to-end on a Visium breast section: plasma-cell/Ig pathway
 tests/test_decomposition.py
+tests/test_spatial.py
 ```
 
 ## Conventions

@@ -31,6 +31,8 @@ def render_pathway_activity_image(
     ax=None,
     colorbar: bool = True,
     title_fontsize: int = 13,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> None:
     """Render a component's per-pixel spatial score ``U[:, k]`` as a tissue heatmap.
 
@@ -54,6 +56,9 @@ def render_pathway_activity_image(
                   compose several components into one figure).
     colorbar    : whether to attach a colour bar.
     title_fontsize : title font size.
+    vmin, vmax  : fix the colour-scale limits. Leaving them None autoscales to the data,
+                  which a few extreme pixels can blow out (everything else then renders
+                  flat); pass e.g. ``vmax=np.percentile(scores, 99)`` for a robust scale.
     """
     scores = np.asarray(scores, dtype=float).ravel()
     h, w = image_shape
@@ -79,7 +84,8 @@ def render_pathway_activity_image(
     else:
         fig = ax.figure
 
-    im = ax.imshow(img, cmap=colormap, origin="upper", interpolation="nearest")
+    im = ax.imshow(img, cmap=colormap, origin="upper", interpolation="nearest",
+                   vmin=vmin, vmax=vmax)
     if colorbar:
         cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.02)
         cbar.set_label(colorbar_label, fontsize=10)

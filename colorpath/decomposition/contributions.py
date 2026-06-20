@@ -75,6 +75,53 @@ def variation_explained(
     return contrib / np.maximum(denom, EPS)
 
 
+def loading_share(
+    U: np.ndarray,
+    V: np.ndarray,
+    normalize: str = "sum",
+) -> np.ndarray:
+    """Per-metabolite share of (scale-invariant) loading captured by each component.
+
+    A gentler sibling of :func:`variation_explained`: it is *linear* in the loading
+    rather than variance-weighted. For metabolite ``m`` the component weight is
+    ``L[k, m] = |V[k, m]| * sd_k`` with ``sd_k = std_p(U[:, k])``, normalised per
+    metabolite. As with :func:`variation_explained` the product ``V[k, m] * sd_k`` is
+    invariant to NMF's per-component scale ambiguity (``U[:, k] -> cU[:, k]``,
+    ``V[k, :] -> V[k, :]/c``), so ``L`` is well defined.
+
+    Because it does **not** square the loading, it does not over-concentrate on the few
+    high-variance, high-abundance metabolites the way :func:`variation_explained` can: a
+    low-abundance pathway member (e.g. a transcription factor sitting beside hugely
+    abundant structural genes) keeps a visible share instead of collapsing to ~0. This
+    makes membership graphs far more readable when one component is dominated by a handful
+    of very abundant features — use ``graph_value="loading_share"`` in
+    :func:`colorpath.illustration.illustrate_component`.
+
+    Parameters
+    ----------
+    U         : (P, K) spatial scores.
+    V         : (K, M) spectral loadings.
+    normalize : ``"sum"`` divides each metabolite's column by the total over components
+                (columns sum to 1); ``"max"`` divides by the largest component.
+
+    Returns
+    -------
+    L : (K, M) array in ``[0, 1]``. ``L[k, m]`` is the share of metabolite ``m``'s
+        loading attributable to component ``k``.
+    """
+    U = np.asarray(U, dtype=float)
+    V = np.asarray(V, dtype=float)
+    s = U.std(axis=0)                      # (K,) scale-invariance weight
+    contrib = np.abs(V) * s[:, None]       # (K, M), linear in V
+    if normalize == "sum":
+        denom = contrib.sum(axis=0, keepdims=True)
+    elif normalize == "max":
+        denom = contrib.max(axis=0, keepdims=True)
+    else:
+        raise ValueError("normalize must be 'sum' or 'max'")
+    return contrib / np.maximum(denom, EPS)
+
+
 def spatial_variation_explained(
     U: np.ndarray,
     V: np.ndarray,

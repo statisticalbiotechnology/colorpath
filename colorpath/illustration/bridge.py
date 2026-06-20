@@ -20,7 +20,7 @@ from typing import Sequence
 
 import numpy as np
 
-from ..decomposition.contributions import variation_explained
+from ..decomposition.contributions import loading_share, variation_explained
 from .pathway_graph import draw_pathway
 from .pathway_image import render_pathway_activity_image
 
@@ -80,7 +80,11 @@ def illustrate_component(
                        raw loading ``V[k, :]`` (linear-abundance units); ``"explained"``
                        colours by the per-metabolite fraction of variation explained by the
                        component (:func:`variation_explained`), in [0, 1] — this removes the
-                       concentration imbalance that makes the raw loading look near-binary.
+                       concentration imbalance that makes the raw loading look near-binary;
+                       ``"loading_share"`` colours by the per-metabolite loading share
+                       (:func:`loading_share`), in [0, 1] — like ``"explained"`` but linear
+                       (not variance-weighted), so low-abundance pathway members keep a
+                       visible share instead of collapsing to ~0.
     graph_kwargs     : extra keyword arguments forwarded to
                        :func:`pathway_graph.draw_pathway` (e.g. ``figsize``,
                        ``node_size``, ``font_size``, ``layout``).
@@ -114,12 +118,17 @@ def illustrate_component(
         node_values = F[component, :]
         graph_units = "fraction of variation explained"
         vlim = dict(vmin=0.0, vmax=1.0)
+    elif graph_value == "loading_share":
+        L = loading_share(Umat, Vmat)                # (K, M) in [0, 1]
+        node_values = L[component, :]
+        graph_units = "loading share"
+        vlim = dict(vmin=0.0, vmax=1.0)
     elif graph_value == "loading":
         node_values = Vmat[component, :]
         graph_units = units
         vlim = {}
     else:
-        raise ValueError("graph_value must be 'loading' or 'explained'")
+        raise ValueError("graph_value must be 'loading', 'explained', or 'loading_share'")
 
     abundance = {name: float(node_values[j]) for j, name in enumerate(metabolite_names)}
 

@@ -9,6 +9,11 @@ Two subpackages:
 * :mod:`colorpath.illustration` — the visualisation layer: pathway activity graph
   (loadings over the metabolite network) and pathway activity image (spatial scores
   over the tissue), plus a bridge tying a component to both.
+
+The same engine applies unchanged to **spatial transcriptomics** (Visium / Visium HD),
+where rows are spots and columns are genes; :mod:`colorpath.spatial` adds the I/O and
+bookkeeping to load such an export and feed it to the decomposition + illustration layers
+(see ``demo_visium_plasma.py``).
 """
 
-__all__ = ["decomposition", "illustration"]
+__all__ = ["decomposition", "illustration", "spatial"]
