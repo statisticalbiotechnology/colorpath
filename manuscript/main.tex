@@ -73,8 +73,23 @@ with saturation censoring and a path to isomer-aware pathway enrichment.
 \section{Introduction}
 \label{sec:intro}
 
-Matrix factorisation of the (pixels\,$\times$\,$m/z$) matrix is the standard multivariate
-tool for imaging mass spectrometry. PCA, ICA, and NMF have all been applied to MALDI-MSI,
+Spatial biology profiles, at many locations across intact tissue, the abundances of many
+molecular species at once. Imaging mass spectrometry (IMS / MALDI-MSI) records hundreds of
+metabolite or lipid ions per pixel; spatial transcriptomics records thousands of gene counts
+per spot; spatial proteomics and related assays add further feature types on the same
+spatial substrate. Across these technologies the data share one structure --- a non-negative
+matrix of (location $\times$ feature) abundances registered to tissue coordinates --- and one
+recurring goal: to summarise a section as a handful of interpretable \emph{spatial
+pathway-activity components}, each pairing a spatial map of \emph{where} a coordinated
+molecular programme is active with a loading vector of \emph{which} features participate.
+Nothing in this goal, nor in the method we develop for it, is tied to a particular
+instrument: we validate it on two modalities --- IMS metabolites and spatial-transcriptomic
+counts --- but it applies to any spatial-omics matrix whose features are non-negative,
+multiplicatively co-regulated, and measured with signal-dependent error.
+
+Matrix factorisation of the (locations\,$\times$\,features) matrix is the established
+multivariate tool, and it is most thoroughly explored in imaging mass spectrometry. PCA,
+ICA, and NMF have all been applied to MALDI-MSI,
 and the comparison by \citet{siy2007} on mouse cerebellum found ICA and NMF more effective
 than PCA, with NMF's non-negativity matching the physical non-negativity of ion abundances
 and yielding parts-based, additive factors. \citet{leuschner2019} make the
@@ -86,17 +101,19 @@ afterwards by annotation and enrichment \citep{jones2014,wittmann2025}.
 
 We focus on a question logically prior to enrichment: \textbf{what should the factorisation
 optimise so that its components are faithful to how pathways and measurements actually
-behave?} Two properties of IMS data constrain the answer.
+behave?} Two properties of these data constrain the answer.
 
 \paragraph{(R1) Measurement error is multiplicative.} Ion intensities are corrupted by
 gain/efficiency fluctuations that scale with signal: a measured value behaves like
 $x = \mu\,\varepsilon$ with multiplicative $\varepsilon > 0$, so error grows with abundance.
-The conventional remedy is to take logarithms, after which the error is approximately
+Sequencing-count modalities share this signal-dependent character --- sampling (Poisson, and
+typically over-dispersed) noise whose variance grows with the mean. The conventional remedy
+is to take logarithms, after which the error is approximately
 additive and ordinary least-squares / PCA apply.
 
 \paragraph{(R2) Pathway coupling is multiplicative.} Membership in a common pathway means
-coordinated, \emph{proportional} change: if metabolites A and B are co-regulated, doubling
-the local activity of the pathway scales both. In linear space a rank-1 component
+coordinated, \emph{proportional} change: if two features A and B (metabolites or
+transcripts, say) are co-regulated, doubling the local activity of the pathway scales both. In linear space a rank-1 component
 $u\,v^{\!\top}$ encodes precisely this --- the entry $u_p v_m$ is a per-pixel activity times
 a per-metabolite loading, a product. This is the structure we want a component to capture.
 
