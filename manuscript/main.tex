@@ -21,8 +21,8 @@
 \newcommand{\HSIC}{\mathrm{HSIC}}
 \newcommand{\code}[1]{\texttt{#1}}
 
-\title{Multiplicatively-coherent pathway-activity decomposition\\
-of imaging mass spectrometry}
+\title{Multiplicatively-coherent spatial pathway-activity analysis\\
+of imaging mass spectrometry and spatial transcriptomics}
 
 \author{%
   TBD\\
@@ -46,7 +46,8 @@ error. We argue this conventional pipeline contains an internal contradiction: a
 can serve the \emph{error model} (turning multiplicative measurement noise into additive
 noise that least squares handles) \emph{or} the \emph{coupling model} (preserving the
 multiplicative co-regulation that defines a pathway), but not both. We present
-\code{colorpath}, a decomposition engine built around this distinction. It performs
+\code{colorpath}, a framework for \emph{spatial pathway-activity analysis} built around
+this distinction. It performs
 Itakura--Saito (IS) or Kullback--Leibler (KL) NMF in \emph{linear} space, so each rank-1
 component is literally a multiplicative outer product (coupling preserved) while a
 scale-invariant divergence supplies the multiplicative-error model (no log needed);
