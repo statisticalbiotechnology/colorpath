@@ -439,7 +439,8 @@ the single-region IMS sections cannot: does a \emph{single} pathway carry \emph{
 dominating sub-programmes in different tissue regions}? KL-NMF at $K = 5$ resolves the
 pathway into spatially segregated modules, and their \textbf{dominant-component map}---the
 per-spot argmax of the fraction-explained $G_{p,k}$ (Equation~\ref{eq:spatial-explained})
----reconstructs the anatomy. Component~0 is a striatal medium-spiny-neuron programme
+---reconstructs the anatomy (Figure~\ref{fig:visium}). Component~0 is a striatal
+medium-spiny-neuron programme
 (\textit{Gpr88}, \textit{Ppp1r1b}/DARPP-32, \textit{Penk}, \textit{Adcy5}, \textit{Drd1});
 component~1 is cortical-glutamatergic (\textit{Slc17a7}, \textit{Camk2a}, \textit{Satb2},
 \textit{Grin2a}); a GABAergic module (\textit{Gad1}/\textit{Gad2}/\textit{Slc32a1}) and a
@@ -460,6 +461,31 @@ exaggerates the separation while the structure itself is robust to the choice. T
 thus a property of the pathway, not of the preprocessing, and the linear KL fit (consistent
 with the metabolite analysis) is the more faithful model. The analysis is reproduced by
 \code{demo\_visium\_dopamine.py} on any Space~Ranger / GEO sample.
+
+\begin{figure}[tbp]
+  \centering
+  \IfFileExists{figures/visium_dopamine_components.png}{%
+    \includegraphics[width=\textwidth]{figures/visium_dopamine_components.png}%
+  }{%
+    \fbox{\parbox[c][3.2cm][c]{0.9\textwidth}{\centering\itshape
+      \texttt{figures/visium\_dopamine\_components.png} not found --- regenerate with
+      \texttt{python manuscript/make\_figures.py visium MATRIX.h5
+      TISSUE\_POSITIONS.csv REGION.csv}.}}%
+  }
+  \caption{\textbf{A single neurotransmission pathway decomposes into region-specific
+  dominating components on a mouse-brain Visium section} (\code{V11L12-038\_A1}, GEO
+  \texttt{GSE232910}; raw counts, library-size normalised in linear space, KL-NMF $K=5$).
+  \emph{Left ($K$ panels):} the per-spot activity score $U_{:,k}$ for each component, titled
+  by its top-loading gene --- component~0 (\textit{Gpr88}/\textit{Ppp1r1b}/\textit{Penk})
+  fills the striatum, component~1 (\textit{Camk2a}/\textit{Slc17a7}) the cortex, with
+  GABAergic (\textit{Gad1}) and other modules following. \emph{Centre:} the
+  \textbf{dominant-component} map, the per-spot argmax of the fraction-explained $G_{p,k}$
+  (Equation~\ref{eq:spatial-explained}); a single pathway thereby segments the section into
+  anatomically coherent territories. \emph{Right:} the dataset's striatum annotation, which
+  the component-0 territory recovers ($71\%$ of striatum spots vs.\ $9\%$ elsewhere).
+  Regenerate with \code{python manuscript/make\_figures.py visium <sample files>}.}
+  \label{fig:visium}
+\end{figure}
 
 \section{Discussion}
 \label{sec:discussion}

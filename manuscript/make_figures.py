@@ -9,9 +9,12 @@ network.
 
 Usage:
     python manuscript/make_figures.py /path/to/01_pd_51_raw_by_metabolite_5ppm.parquet
+    python manuscript/make_figures.py visium MATRIX.h5 TISSUE_POSITIONS.csv [REGION.csv]
 
 The parquet must contain columns `x`, `y` (pixel coordinates) and one column per
-metabolite. Figures are written to `manuscript/figures/`.
+metabolite. The `visium` form takes a 10x Space Ranger / GEO sample (e.g. GSE232910) and
+writes the region-specific pathway-component figure. Figures are written to
+`manuscript/figures/`.
 """
 
 from __future__ import annotations
@@ -41,8 +44,9 @@ from colorpath.illustration import (
     render_pathway_activity_image,
 )
 
-N_SHOW = 3      # number of leading components to illustrate
-K = 5           # total components fitted
+N_SHOW = 3      # number of leading components to illustrate (IMS)
+K = 5           # total components fitted (IMS)
+K_VISIUM = 5    # components for the spatial-transcriptomics figure
 
 
 def main(parquet_path: str):
@@ -127,7 +131,75 @@ def main(parquet_path: str):
         print(f"  component {k}: " + ", ".join(mets[i] for i in order))
 
 
+def main_visium(matrix_h5: str, positions: str, regions: str | None = None):
+    """Region-specific pathway-component figure for a 10x / GEO mouse-brain sample.
+
+    Mirrors the analysis reported in the manuscript: linear library-size normalisation (no
+    log), a neurotransmission pathway subset, KL/IS-NMF (loss by the variance-vs-mean
+    diagnostic), and the per-spot dominant-component map (argmax of G).
+    """
+    from colorpath.decomposition import variance_vs_mean
+    from colorpath.illustration import render_dominant_component
+    from colorpath.spatial import (
+        dominant_component,
+        library_normalize,
+        load_visium_10x_h5,
+        neurotransmission_gene_set,
+        per_gene_scale,
+        to_dense,
+    )
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    figdir = os.path.join(here, "figures")
+    os.makedirs(figdir, exist_ok=True)
+
+    exp = load_visium_10x_h5(matrix_h5, positions, regions)
+    Xnorm = library_normalize(exp.X)                       # linear depth correction, no log
+    gidx, names = neurotransmission_gene_set(exp.genes)
+    vm = variance_vs_mean(to_dense(exp.X[:, gidx]))
+    print(f"var~mean^{vm.slope:.2f} -> loss={vm.recommended_loss!r}; "
+          f"{len(names)} pathway genes present")
+    Xsub = per_gene_scale(Xnorm[:, gidx])
+    res = LinearNMF(K_VISIUM, loss=vm.recommended_loss, max_iter=600,
+                    random_state=0).fit(Xsub)
+    dom = dominant_component(res.U, res.V)
+    labels = [names[int(np.argmax(res.V[k]))] for k in range(res.K)]
+
+    has_region = exp.region is not None
+    ncol = res.K + (2 if has_region else 1)
+    fig, axes = plt.subplots(1, ncol, figsize=(3.6 * ncol, 4.0))
+    for k in range(res.K):
+        a = axes[k]
+        a.scatter(exp.x, exp.y, c=res.U[:, k], s=4, cmap="magma",
+                  vmin=0, vmax=max(np.percentile(res.U[:, k], 99), 1e-9))
+        a.set_title(f"comp {k}\n{labels[k]}", fontsize=10)
+        a.set_aspect("equal"); a.invert_yaxis(); a.set_xticks([]); a.set_yticks([])
+    render_dominant_component(dom, exp.x, exp.y, ax=axes[res.K], component_names=labels,
+                              n_components=res.K, title="dominant component", legend=True)
+    if has_region:
+        a = axes[res.K + 1]
+        for r in sorted(set(exp.region)):
+            sel = exp.region == r
+            a.scatter(exp.x[sel], exp.y[sel], s=4, label=r)
+        a.set_aspect("equal"); a.invert_yaxis(); a.set_xticks([]); a.set_yticks([])
+        a.set_title("region"); a.legend(fontsize=7, markerscale=2, loc="best")
+    fig.suptitle("Mouse-brain Visium: a neurotransmission pathway decomposed into "
+                 "region-specific dominating components (linear counts + KL-NMF)",
+                 fontsize=12)
+    out = os.path.join(figdir, "visium_dopamine_components.png")
+    fig.savefig(out, dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    print("wrote", out)
+    for k in range(res.K):
+        print(f"  comp {k}: " + ", ".join(names[i] for i in np.argsort(res.V[k])[::-1][:6]))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("usage: python manuscript/make_figures.py <parquet_path>")
-    main(sys.argv[1])
+    if len(sys.argv) >= 4 and sys.argv[1] == "visium":
+        main_visium(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None)
+    elif len(sys.argv) == 2:
+        main(sys.argv[1])
+    else:
+        sys.exit("usage: python manuscript/make_figures.py <parquet_path>\n"
+                 "   or: python manuscript/make_figures.py visium "
+                 "<matrix.h5> <tissue_positions.csv> [region.csv]")
