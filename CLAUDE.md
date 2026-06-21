@@ -20,16 +20,26 @@ colorpath/
     selection.py            # K selection (elbow), best-of n_init restarts
   illustration/             # the visualisation layer — REUSE, do not reimplement
     pathway_graph.py        # draw_pathway: metabolite network coloured by a loading vector
-    pathway_image.py        # render_pathway_activity_image: spatial score -> tissue heatmap
+    pathway_image.py        # render_pathway_activity_image: spatial score -> tissue heatmap;
+                            #   render_dominant_component: categorical "which component dominates" map
     bridge.py               # illustrate_component: one component -> both views
-  spatial.py                # spatial-transcriptomics (Visium/HD) I/O: load export, gene-set
-                            #   select, per-gene scale, grid index, co-expression edges (reuses engine)
+  spatial.py                # spatial-transcriptomics (Visium/HD) I/O + helpers: load export or 10x
+                            #   Space Ranger .h5, case-insensitive gene-set select, library_normalize
+                            #   (LINEAR depth correction, no log), per-gene scale, grid index,
+                            #   co-expression edges, dominant_component (reuses the engine)
 pathway_viz.py              # backward-compatible shim (re-exports draw_pathway) + dopamine example
 demo_decomposition.py       # end-to-end synthetic pipeline (diagnostics -> Route 2 -> illustrate -> Route 1)
 demo_visium_plasma.py       # end-to-end on a Visium breast section: plasma-cell/Ig pathway
+demo_visium_dopamine.py     # mouse-brain Visium: a neurotransmission pathway -> region-specific
+                            #   components (linear counts + KL, no log) + dominant-component map
 tests/test_decomposition.py
 tests/test_spatial.py
 ```
+
+**Spatial transcriptomics counts:** treat counts like the metabolites — stay in **linear**
+space (`library_normalize` is a linear depth correction; **do not `log1p`**) and let the
+KL/IS loss model the error. Logging counts re-introduces exactly the error-vs-coupling
+conflation the package exists to avoid.
 
 ## Conventions
 

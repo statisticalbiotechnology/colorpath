@@ -59,7 +59,11 @@ catecholamine/serotonin MALDI-MSI section ($7{,}730$ pixels $\times$ $27$ metabo
 pipeline auto-selects the KL loss, decomposes the image into five spatially-distinct
 components explaining ${\sim}85\%$ of the signal, and---without prompting---surfaces three
 pairs of metabolites that are perfectly co-linear because they are unresolved isobars at
-$5$~ppm, illustrating why downstream pathway labelling must be ambiguity-aware. The
+$5$~ppm, illustrating why downstream pathway labelling must be ambiguity-aware. The same
+linear-space formulation transfers beyond mass spectrometry: on a mouse-brain
+spatial-transcriptomics section a single neurotransmission pathway decomposes into
+anatomically distinct \emph{dominating} components---striatal versus cortical---recovering
+brain regions from gene counts without a log transform. The
 contribution is not a new factorisation algorithm but the \emph{statistical coherence of
 the pipeline}: matching a multiplicative coupling model to a multiplicative error model,
 with saturation censoring and a path to isomer-aware pathway enrichment.
@@ -417,6 +421,46 @@ as an active tool when they do not.
   \end{tabular}
 \end{table}
 
+\subsection{Generality: region-specific pathway components in spatial transcriptomics}
+\label{sec:spatial}
+
+The error-vs-coupling argument is not specific to mass spectrometry. In spatial
+transcriptomics the rows are tissue spots and the columns are gene counts; counting/sampling
+noise is multiplicative in the sense of R1 (variance growing with the mean, Poisson to
+over-dispersed) and pathway co-regulation is multiplicative in the sense of R2, so the
+ubiquitous ``$\log(1+x)$-normalise, then PCA/NMF'' recipe commits exactly the conflation of
+Section~\ref{sec:intro}. We therefore treat counts like the metabolites: a \emph{linear}
+per-spot library-size normalisation (no log), then KL/IS-NMF in linear space.
+
+We applied this to a mouse-brain Visium section (GEO \texttt{GSE232910}, sample
+\code{V11L12-038\_A1}; $2{,}856$ spots $\times$ $32{,}285$ genes, raw counts) restricted to a
+$36$-gene neuroactive-ligand/receptor (\emph{neurotransmission}) pathway, posing a question
+the single-region IMS sections cannot: does a \emph{single} pathway carry \emph{different
+dominating sub-programmes in different tissue regions}? KL-NMF at $K = 5$ resolves the
+pathway into spatially segregated modules, and their \textbf{dominant-component map}---the
+per-spot argmax of the fraction-explained $G_{p,k}$ (Equation~\ref{eq:spatial-explained})
+---reconstructs the anatomy. Component~0 is a striatal medium-spiny-neuron programme
+(\textit{Gpr88}, \textit{Ppp1r1b}/DARPP-32, \textit{Penk}, \textit{Adcy5}, \textit{Drd1});
+component~1 is cortical-glutamatergic (\textit{Slc17a7}, \textit{Camk2a}, \textit{Satb2},
+\textit{Grin2a}); a GABAergic module (\textit{Gad1}/\textit{Gad2}/\textit{Slc32a1}) and a
+thalamic one (\textit{Tcf7l2}) follow. Against the dataset's own anatomical annotation,
+component~0 dominates $71\%$ of striatum spots versus $9\%$ elsewhere, and component~1
+dominates $41\%$ of non-striatum spots versus $1\%$ of striatum. Restricting the pathway to
+the two dopamine receptors \textit{Drd1}/\textit{Drd2} sharpens the striatal localisation
+(striatal vs.\ non-striatal activity ratio $3.5$; Mann--Whitney $p \approx 10^{-162}$ against
+the region labels). The cell-body/terminal dissociation expected of dopaminergic biology is
+also recovered: the synthesis enzymes \textit{Th}/\textit{Ddc}, whose cell bodies lie in the
+midbrain outside this coronal plane, show \emph{no} striatal enrichment, whereas the
+striatal receptor/terminal markers do.
+
+Crucially, decomposing the \emph{same} data after the conventional $\log(1+x)$ transform
+leaves the regional split intact but \emph{inflates} it---component~0's striatal dominance
+reads $84\%$ under the log against $71\%$ under the linear KL fit---so the log preprocessing
+exaggerates the separation while the structure itself is robust to the choice. The finding is
+thus a property of the pathway, not of the preprocessing, and the linear KL fit (consistent
+with the metabolite analysis) is the more faithful model. The analysis is reproduced by
+\code{demo\_visium\_dopamine.py} on any Space~Ranger / GEO sample.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -447,6 +491,18 @@ or multiplicative coupling. Where prior MSI work either ran NMF \emph{or} ICA
 non-negative, multiplicatively-correct factorisation}, with a dimensionless weight that
 interpolates between the two extremes and a kernel-alignment diagnostic to certify the
 result.
+
+\paragraph{Generality beyond IMS.} The same linear-space, multiplicative-error formulation
+applies unchanged to spatial transcriptomics (Section~\ref{sec:spatial}): counts are kept
+linear (a linear library-size correction, never a log) and KL/IS supplies the error model,
+so a pathway's components remain genuine multiplicative outer products. The
+spatial-transcriptomics result also exercises a capability latent in the IMS analysis but
+not displayed there---decomposing \emph{one} pathway into sub-programmes that dominate
+different tissue regions, read off the fraction-explained map $G_{p,k}$---suggesting the
+method's natural use is less ``one pathway, one map'' than ``one pathway, a set of
+region-specific programmes.'' That counts and metabolite intensities are handled by the
+identical engine, differing only in the noise-model diagnostic's choice of loss, is itself
+evidence that the coherence argument, not any modality-specific trick, is doing the work.
 
 \paragraph{Novelty, stated plainly.} The factorisation itself is not novel --- IS/KL-NMF,
 masked NMF, and kernel independence contrasts are standard. The defensible methodological
@@ -488,7 +544,10 @@ The decomposition engine, illustration layer, diagnostics, synthetic-data demo, 
 tests are implemented in the \code{colorpath} package (\code{colorpath/decomposition/},
 \code{colorpath/illustration/}). The end-to-end pipeline of Section~\ref{sec:results} is
 reproduced by \code{demo\_decomposition.py}; design details are documented in
-\code{CLAUDE.md}.
+\code{CLAUDE.md}. The spatial-transcriptomics extension (Section~\ref{sec:spatial}) lives in
+\code{colorpath/spatial.py} (10x Space~Ranger \code{.h5} loading, linear library-size
+normalisation, gene-set selection, and the dominant-component view) and is reproduced by
+\code{demo\_visium\_dopamine.py}.
 
 \bibliography{ref}
 

@@ -98,3 +98,75 @@ def render_pathway_activity_image(
         fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
         print(f"Saved: {output}")
         plt.close(fig)
+
+
+def render_dominant_component(
+    labels: np.ndarray,
+    x: np.ndarray,
+    y: np.ndarray,
+    output: str = "dominant_component.svg",
+    *,
+    component_names: list[str] | None = None,
+    n_components: int | None = None,
+    title: str = "Dominant pathway component",
+    colormap: str = "tab10",
+    figsize: tuple[float, float] = (6, 6),
+    marker_size: float = 8.0,
+    invert_yaxis: bool = True,
+    legend: bool = True,
+    ax=None,
+) -> None:
+    """Categorical map of which component dominates each spot.
+
+    Companion to :func:`render_pathway_activity_image`: instead of one component's
+    continuous score, this scatters the tissue spots coloured by a categorical label —
+    typically :func:`colorpath.spatial.dominant_component` (the per-spot argmax of the
+    fraction-of-variation-explained). When a pathway is decomposed into K sub-programmes,
+    this segments the tissue by which sub-programme is locally strongest, so a single
+    pathway can reveal anatomically distinct regions.
+
+    Parameters
+    ----------
+    labels          : (P,) integer component index per spot.
+    x, y            : (P,) spot coordinates (e.g. full-res pixels or grid indices).
+    output          : output path (ignored when ``ax`` is supplied).
+    component_names : optional length-K labels for the legend (defaults to ``comp k``).
+    n_components    : K, inferred from ``labels`` when None.
+    colormap        : a qualitative matplotlib colormap.
+    invert_yaxis    : flip y so the image matches tissue orientation.
+    legend          : draw a legend mapping colours to components.
+    ax              : optional Axes to draw into (no figure is created/saved then).
+    """
+    labels = np.asarray(labels, dtype=int).ravel()
+    x = np.asarray(x, dtype=float).ravel()
+    y = np.asarray(y, dtype=float).ravel()
+    K = n_components if n_components is not None else int(labels.max()) + 1
+    cmap = matplotlib.colormaps[colormap]
+
+    created = ax is None
+    if created:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    for k in range(K):
+        sel = labels == k
+        if not sel.any():
+            continue
+        name = component_names[k] if component_names is not None else f"comp {k}"
+        ax.scatter(x[sel], y[sel], s=marker_size, color=cmap(k % cmap.N), label=name)
+
+    ax.set_aspect("equal")
+    if invert_yaxis:
+        ax.invert_yaxis()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    if legend:
+        ax.legend(markerscale=2, fontsize=8, loc="best", framealpha=0.9)
+
+    if created:
+        fig.tight_layout()
+        fig.savefig(output, format=output.rsplit(".", 1)[-1], bbox_inches="tight")
+        print(f"Saved: {output}")
+        plt.close(fig)

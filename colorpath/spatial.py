@@ -45,6 +45,8 @@ from pathlib import Path
 import numpy as np
 import scipy.sparse as sp
 
+from .decomposition.contributions import spatial_variation_explained
+
 
 # A compact, curated plasma-cell / B-lineage program (human HGNC symbols). The secretory
 # machinery (MZB1, DERL3, XBP1, SSR4, SEL1L, HERPUD1) and plasma transcription / receptor
@@ -69,8 +71,10 @@ class SpatialExport:
     X        : (P, M) ``scipy.sparse`` matrix of spots x genes (non-negative).
     genes    : list of M gene symbols (columns of ``X``).
     barcodes : list of P spot barcodes (rows of ``X``).
-    x, y     : (P,) integer grid coordinates of each spot.
+    x, y     : (P,) coordinates of each spot (grid indices or full-res pixels).
     sample   : (P,) sample id of each spot (Visium runs often tile several sections).
+    region   : optional (P,) anatomical/region label per spot (e.g. striatum), when the
+               export carries an annotation; ``None`` otherwise.
     """
 
     X: sp.spmatrix
@@ -79,6 +83,7 @@ class SpatialExport:
     x: np.ndarray
     y: np.ndarray
     sample: np.ndarray
+    region: np.ndarray | None = None
 
     @property
     def n_spots(self) -> int:
@@ -176,6 +181,7 @@ def select_genes(
     symbols: list[str] | None = None,
     prefixes: tuple[str, ...] | None = None,
     exclude_prefixes: tuple[str, ...] = (),
+    case_insensitive: bool = False,
 ) -> tuple[np.ndarray, list[str]]:
     """Indices (and names) of a gene set, by exact symbol and/or symbol prefix.
 
@@ -187,19 +193,28 @@ def select_genes(
                        ``("IGH", "IGK", "IGL")`` for the immunoglobulin loci).
     exclude_prefixes : drop genes matching these even if a ``prefixes`` rule caught them
                        (e.g. ``("IGHMBP",)`` to keep the IGHMBP helicase out of the Ig set).
+    case_insensitive : match symbols/prefixes ignoring case, so one gene set works across
+                       human (all-caps ``TH``) and mouse (title-case ``Th``) annotations.
 
     Returns
     -------
     (idx, names) : sorted integer column indices and the corresponding symbols.
     """
-    pos = {g: i for i, g in enumerate(genes)}
+    fold = (lambda s: s.upper()) if case_insensitive else (lambda s: s)
+    pos: dict[str, int] = {}
+    for i, g in enumerate(genes):
+        pos.setdefault(fold(g), i)
     idx: set[int] = set()
     for s in symbols or []:
-        if s in pos:
-            idx.add(pos[s])
+        j = pos.get(fold(s))
+        if j is not None:
+            idx.add(j)
     if prefixes:
+        pref = tuple(fold(p) for p in prefixes)
+        expref = tuple(fold(p) for p in exclude_prefixes)
         for i, g in enumerate(genes):
-            if g.startswith(tuple(prefixes)) and not g.startswith(tuple(exclude_prefixes)):
+            gg = fold(g)
+            if gg.startswith(pref) and not (expref and gg.startswith(expref)):
                 idx.add(i)
     sel = np.array(sorted(idx), dtype=int)
     return sel, [genes[i] for i in sel]
@@ -289,3 +304,161 @@ def coexpression_edges(
             if np.isfinite(C[i, j]) and C[i, j] > threshold:
                 edges.append((names[i], names[j]))
     return edges
+
+
+# A neuroactive-ligand/receptor (neurotransmission) pathway spanning the major
+# transmitter systems, in mouse (title-case) symbols; pass ``case_insensitive=True`` to
+# match human all-caps annotations too. Decomposing it over a brain section yields modules
+# that dominate distinct anatomy (striatal-MSN, cortical-glutamatergic, GABAergic, …).
+NEUROTRANSMISSION_GENES = [
+    # dopaminergic / striatal projection neuron
+    "Drd1", "Drd2", "Adora2a", "Ppp1r1b", "Pde10a", "Gpr88", "Penk", "Pdyn", "Tac1",
+    "Rgs9", "Gnal", "Adcy5",
+    # glutamatergic / cortical excitatory
+    "Slc17a7", "Grin1", "Grin2a", "Grin2b", "Gria1", "Gria2", "Grm5", "Camk2a", "Satb2",
+    "Neurod6",
+    # GABAergic / interneuron
+    "Gad1", "Gad2", "Gabra1", "Gabrb2", "Gabbr1", "Sst", "Pvalb", "Vip", "Slc32a1",
+    # modulatory / thalamic
+    "Chrm1", "Chrm3", "Htr2a", "Htr1a", "Slc17a6", "Tcf7l2",
+]
+
+
+def neurotransmission_gene_set(genes: list[str]) -> tuple[np.ndarray, list[str]]:
+    """Convenience: the :data:`NEUROTRANSMISSION_GENES` present in ``genes`` (any casing)."""
+    return select_genes(genes, symbols=NEUROTRANSMISSION_GENES, case_insensitive=True)
+
+
+def library_normalize(X, target_sum: float | None = None):
+    """Per-spot library-size normalisation — a *linear* sequencing-depth correction.
+
+    Divides each spot (row) by its total counts and rescales to ``target_sum`` (the median
+    spot total when ``None``). This removes depth differences between spots **without
+    leaving linear space**: unlike the routine ``log1p`` normalisation, it does not convert
+    the multiplicative pathway coupling into an additive offset, so the linear-space Route-2
+    model (multiplicative coupling + a multiplicative-error KL/IS loss) still applies. Run
+    it on the *full* gene matrix (so the size factor reflects all genes) before subsetting
+    to a pathway.
+
+    Parameters
+    ----------
+    X          : (P, M) counts matrix (sparse or dense).
+    target_sum : total to scale each spot to; defaults to the median spot total.
+
+    Returns
+    -------
+    (P, M) ``scipy.sparse`` CSR matrix of library-normalised, still-linear values.
+    """
+    X = sp.csr_matrix(X)
+    lib = np.asarray(X.sum(axis=1)).ravel()
+    lib[lib == 0] = 1.0
+    if target_sum is None:
+        target_sum = float(np.median(lib))
+    return X.multiply((target_sum / lib)[:, None]).tocsr()
+
+
+def dominant_component(U: np.ndarray, V: np.ndarray, mode: str = "variance") -> np.ndarray:
+    """Per-spot index of the pathway component that dominates the local signal.
+
+    The argmax over components of the per-spot fraction-of-variation-explained
+    (:func:`colorpath.decomposition.spatial_variation_explained`). Rendered with
+    :func:`colorpath.illustration.render_dominant_component`, it segments the tissue by
+    *which* sub-programme of a pathway is locally strongest — e.g. a neurotransmission
+    pathway over a brain section resolves into striatal vs. cortical vs. GABAergic
+    territories, reconstructing anatomy from a single pathway.
+
+    Parameters
+    ----------
+    U, V : (P, K) spatial scores and (K, M) loadings from a fitted decomposition.
+    mode : weighting passed to :func:`spatial_variation_explained` (``"variance"`` or
+           ``"energy"``).
+
+    Returns
+    -------
+    (P,) integer array of dominating-component indices.
+    """
+    G = spatial_variation_explained(np.asarray(U, float), np.asarray(V, float), mode=mode)
+    return G.argmax(axis=1)
+
+
+def _read_tissue_positions(path: str | Path) -> dict[str, tuple[float, float]]:
+    """Parse a Space Ranger ``tissue_positions(_list).csv`` -> {barcode: (x, y)} in full-res
+    pixels. Handles both the headerless (``tissue_positions_list.csv``) and headered
+    (``tissue_positions.csv``) layouts; columns are
+    barcode, in_tissue, array_row, array_col, pxl_row_in_fullres, pxl_col_in_fullres."""
+    coords: dict[str, tuple[float, float]] = {}
+    with open(path, newline="") as fh:
+        for row in csv.reader(fh):
+            if not row or row[0].strip().lower() == "barcode":
+                continue
+            coords[row[0]] = (float(row[5]), float(row[4]))   # x = pxl_col, y = pxl_row
+    return coords
+
+
+def load_visium_10x_h5(
+    matrix_h5: str | Path,
+    positions: str | Path,
+    regions: str | Path | None = None,
+    *,
+    sample: object = 1,
+) -> SpatialExport:
+    """Load a 10x Space Ranger sample (e.g. a GEO deposit) into a :class:`SpatialExport`.
+
+    Reads a ``*_filtered_feature_bc_matrix.h5`` (the 10x HDF5 count matrix), a
+    ``tissue_positions(_list).csv`` for the spot coordinates, and an optional per-spot
+    region-annotation CSV (``barcode,region``). The counts are returned **as raw counts**
+    in linear space — pair with :func:`library_normalize` (linear) and a KL/IS loss rather
+    than a log transform.
+
+    Parameters
+    ----------
+    matrix_h5 : path to the 10x ``filtered_feature_bc_matrix.h5``.
+    positions : path to ``tissue_positions_list.csv`` / ``tissue_positions.csv``.
+    regions   : optional CSV with a header and ``barcode,region`` columns.
+    sample    : sample id stamped on every spot (single-section files).
+
+    Returns
+    -------
+    :class:`SpatialExport` with ``X`` (spots x genes, raw counts) and, if ``regions`` is
+    given, a per-spot ``region`` label.
+
+    Notes
+    -----
+    Requires :mod:`h5py` (imported lazily).
+    """
+    import h5py
+
+    with h5py.File(matrix_h5, "r") as f:
+        m = f["matrix"]
+        data, indices, indptr = m["data"][:], m["indices"][:], m["indptr"][:]
+        shape = tuple(int(s) for s in m["shape"][:])          # (genes, spots)
+        genes = [g.decode() if isinstance(g, bytes) else str(g) for g in m["features/name"][:]]
+        barcodes = [b.decode() if isinstance(b, bytes) else str(b) for b in m["barcodes"][:]]
+    X = sp.csc_matrix((data, indices, indptr), shape=shape).T.tocsr()   # spots x genes
+
+    coords = _read_tissue_positions(positions)
+    missing = [b for b in barcodes if b not in coords]
+    if missing:
+        raise ValueError(f"{len(missing)} matrix barcodes missing from {positions}")
+    x = np.array([coords[b][0] for b in barcodes])
+    y = np.array([coords[b][1] for b in barcodes])
+
+    region = None
+    if regions is not None:
+        rmap: dict[str, str] = {}
+        with open(regions, newline="") as fh:
+            reader = csv.reader(fh)
+            next(reader, None)                                 # header
+            for row in reader:
+                if len(row) >= 2:
+                    rmap[row[0]] = row[1]
+        region = np.array([rmap.get(b, "") for b in barcodes])
+
+    if not (X.shape[0] == len(barcodes) == len(x)):
+        raise ValueError("row mismatch between matrix, barcodes and coordinates")
+    if X.shape[1] != len(genes):
+        raise ValueError("column mismatch between matrix and gene names")
+    return SpatialExport(
+        X=X, genes=genes, barcodes=barcodes, x=x, y=y,
+        sample=np.array([sample] * len(barcodes)), region=region,
+    )

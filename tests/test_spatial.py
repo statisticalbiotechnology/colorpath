@@ -15,10 +15,14 @@ import scipy.sparse as sp
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from colorpath.decomposition import LinearNMF, loading_share, variation_explained
-from colorpath.illustration import illustrate_component
+from colorpath.illustration import illustrate_component, render_dominant_component
 from colorpath.spatial import (
     coexpression_edges,
+    dominant_component,
+    library_normalize,
     load_spatial_export,
+    load_visium_10x_h5,
+    neurotransmission_gene_set,
     per_gene_scale,
     plasma_cell_gene_set,
     sample_grid,
@@ -198,3 +202,93 @@ def test_end_to_end_visium_pipeline(tmp_path):
         graph_output=out_graph, image_output=out_image,
     )
     assert os.path.exists(paths["graph"]) and os.path.exists(paths["image"])
+
+
+# ----------------------------- count-model helpers -----------------------------
+
+def test_select_genes_case_insensitive_matches_mouse_and_human():
+    genes = ["Th", "Drd1", "Gad1", "Xkr4"]          # mouse title-case
+    idx, names = select_genes(genes, symbols=["TH", "DRD1"], case_insensitive=True)
+    assert set(names) == {"Th", "Drd1"}
+    # case-sensitive default would miss the all-caps query
+    assert select_genes(genes, symbols=["TH"])[1] == []
+
+
+def test_neurotransmission_gene_set():
+    genes = ["Drd1", "Slc17a7", "Gad1", "Actb"]
+    idx, names = neurotransmission_gene_set(genes)
+    assert {"Drd1", "Slc17a7", "Gad1"}.issubset(names)
+    assert "Actb" not in names
+
+
+def test_library_normalize_equalises_spot_totals():
+    X = np.array([[1.0, 1.0, 2.0], [10.0, 10.0, 20.0], [0.0, 0.0, 0.0]])
+    Xn = library_normalize(X).toarray()
+    tot = Xn.sum(axis=1)
+    # the two non-empty spots (4x apart in depth) now share the same total...
+    assert np.isclose(tot[0], tot[1])
+    # ...and proportions within a spot are preserved (linear, not log)
+    assert np.allclose(Xn[0] / Xn[0].sum(), X[0] / X[0].sum())
+
+
+def test_dominant_component_picks_locally_strongest():
+    # comp 0 owns the first 50 spots, comp 1 the rest; both loadings have spread.
+    U = np.zeros((100, 2))
+    U[:50, 0] = 1.0
+    U[50:, 1] = 1.0
+    V = np.array([[2.0, 0.0, 1.0], [0.0, 2.0, 1.0]])
+    dom = dominant_component(U, V)
+    assert np.all(dom[:50] == 0) and np.all(dom[50:] == 1)
+
+
+def test_render_dominant_component_writes_file(tmp_path):
+    rng = np.random.default_rng(0)
+    labels = rng.integers(0, 3, 60)
+    x, y = rng.random(60), rng.random(60)
+    out = os.path.join(str(tmp_path), "dom.svg")
+    render_dominant_component(labels, x, y, output=out,
+                              component_names=["a", "b", "c"], n_components=3)
+    assert os.path.exists(out)
+
+
+# ----------------------------- 10x h5 loader -----------------------------
+
+def write_10x_h5(path, X_genes_by_spots, genes, barcodes):
+    """Write a minimal 10x ``filtered_feature_bc_matrix.h5`` (features x barcodes CSC)."""
+    h5py = pytest.importorskip("h5py")
+    Xc = sp.csc_matrix(X_genes_by_spots)
+    with h5py.File(path, "w") as f:
+        g = f.create_group("matrix")
+        g.create_dataset("data", data=Xc.data)
+        g.create_dataset("indices", data=Xc.indices)
+        g.create_dataset("indptr", data=Xc.indptr)
+        g.create_dataset("shape", data=np.array(Xc.shape))
+        g.create_dataset("barcodes", data=np.array([b.encode() for b in barcodes]))
+        feat = g.create_group("features")
+        feat.create_dataset("name", data=np.array([s.encode() for s in genes]))
+
+
+def test_load_visium_10x_h5_with_regions(tmp_path):
+    pytest.importorskip("h5py")
+    genes = ["Drd1", "Slc17a7", "Gad1"]
+    barcodes = [f"BC{i}-1" for i in range(5)]
+    rng = np.random.default_rng(0)
+    X = rng.integers(0, 9, (len(genes), len(barcodes))).astype(float)   # genes x spots
+    d = str(tmp_path)
+    write_10x_h5(os.path.join(d, "m.h5"), X, genes, barcodes)
+    # headerless tissue_positions_list.csv: barcode,in_tissue,row,col,pxl_row,pxl_col
+    with open(os.path.join(d, "pos.csv"), "w") as fh:
+        for i, b in enumerate(barcodes):
+            fh.write(f"{b},1,{i},{i},{10*i},{20*i}\n")
+    with open(os.path.join(d, "reg.csv"), "w") as fh:
+        fh.write("Barcode,region\n")
+        for i, b in enumerate(barcodes):
+            fh.write(f"{b},{'striatum' if i < 2 else 'not_striatum'}\n")
+
+    exp = load_visium_10x_h5(os.path.join(d, "m.h5"), os.path.join(d, "pos.csv"),
+                             os.path.join(d, "reg.csv"))
+    assert exp.X.shape == (len(barcodes), len(genes))            # spots x genes (transposed)
+    assert exp.genes == genes and exp.barcodes == barcodes
+    assert np.allclose(exp.X.toarray(), X.T)
+    assert (exp.x[1], exp.y[1]) == (20.0, 10.0)                  # x=pxl_col, y=pxl_row
+    assert list(exp.region[:2]) == ["striatum", "striatum"]
