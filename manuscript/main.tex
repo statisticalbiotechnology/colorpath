@@ -560,6 +560,60 @@ with the metabolite analysis) is the more faithful model. The analysis is reprod
   \label{fig:visium}
 \end{figure}
 
+%% ---- PROVISIONAL (added ahead of the matched FMP-10 metabolite data; may be revised or
+%%      removed once that analysis lands). Numbers from the GSE232910 cohort scan. ----
+\subsection{Reproducibility, specificity, and an unbiased pathway scan}
+\label{sec:robustness}
+
+We asked whether the region-specific decomposition is reproducible and specific across the
+mouse-brain cohort (GEO \texttt{GSE232910}; 19 Visium sections). Each section is summarised by
+the best striatum-vs-rest AUC over the $K=5$ component activities (the most striatum-enriched
+component). Across the six striatal sections the dopaminergic and the broad neurotransmission
+programmes localise to the striatum reproducibly (median AUC $0.90$ and $0.95$;
+Table~\ref{tab:robustness}); the GABAergic programme moderately ($0.72$ --- the striatal
+projection neurons are themselves GABAergic); while the serotonergic and noradrenergic
+programmes, whose neurons are not striatal, score at or near chance ($0.62$, $0.53$). This
+\emph{specificity} --- rather than a uniformly high score --- is the evidence that GAIT
+recovers genuine regional biology and not an artefact of the decomposition.
+
+Scored instead against the intact-vs-lesioned annotation of the 6-OHDA model, the transcript
+components sit at chance (AUC $\approx 0.55$ for the dopaminergic, MSN and neuropeptide sets).
+This is expected, and motivating: the lesion depletes dopamine --- the \emph{metabolite} ---
+in the lesioned striatum, but leaves the post-synaptic receptor \emph{transcripts}
+(\textit{Drd1}/\textit{Drd2}) largely intact, so the transcriptomic programme cannot see the
+lesion. It yields a concrete prediction: the matched dopamine-metabolite component (MSI) should
+separate the lesioned hemisphere where the transcript component does not --- a
+transcript-versus-metabolite dissociation only a multimodal measurement can resolve, which we
+will test on the matched FMP-10 data.
+
+Because the score underlying these maps requires no region annotation --- a
+dominant-component-weighted Moran's I of the component activities times the entropy of the
+dominant-component map --- it can rank \emph{arbitrary} pathways by how regionally structured
+their activity is. Applied across a KEGG collection (\code{scan\_pathways.py}) it gives an
+unbiased screen for the pathways most likely to be differentially regulated across the tissue,
+with the annotation-based AUCs above serving as positive controls.
+
+\begin{table}[t]
+  \centering
+  \caption{Reproducibility and specificity across the six striatal sections of
+  \texttt{GSE232910} (median best striatum-vs-rest AUC over $K=5$ GAIT components; linear
+  counts, KL-NMF). Striatal systems localise reproducibly; non-striatal systems score at
+  chance.}
+  \label{tab:robustness}
+  \begin{tabular}{lc}
+    \toprule
+    pathway & striatum AUC (median) \\
+    \midrule
+    neurotransmission (broad) & 0.95 \\
+    dopaminergic              & 0.90 \\
+    GABAergic                 & 0.72 \\
+    serotonergic              & 0.62 \\
+    noradrenergic             & 0.53 (chance) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+%% ---- end PROVISIONAL ----
+
 \section{Discussion}
 \label{sec:discussion}
 
