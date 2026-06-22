@@ -14,8 +14,12 @@ the rest of GAIT.
 Usage:
     python robustness_multisection.py [GSE232910_RAW.tar] [pathway] [K]
 
-    pathway is one of:  dopaminergic da_synthesis msn neuropeptide serotonergic
-                        noradrenergic gabaergic glutamatergic cholinergic myelination
+    pathway is one of:  neurotransmission dopaminergic da_synthesis msn neuropeptide
+                        serotonergic noradrenergic gabaergic glutamatergic cholinergic
+                        myelination
+    (neurotransmission = the broad manuscript set that splits into striatal/cortical/...
+     components; it and dopaminergic are the ones whose axis matches the striatum
+     annotation, so report their striatum AUC as the robustness metric)
     (msn = striatal medium-spiny-neuron direct/D1 vs indirect/D2 programmes; the
      dopaminergic/msn/neuropeptide/serotonergic/noradrenergic/gabaergic sets each have a
      metabolite measured by FMP-10, enabling a metabolite<->transcript comparison)
@@ -41,9 +45,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 
+from scipy.stats import mannwhitneyu
+
 from gait.decomposition import LinearNMF
 from gait.benchmark import region_mutual_information
 from gait.spatial import (
+    NEUROTRANSMISSION_GENES,
     dominant_component,
     library_normalize,
     load_visium_10x_h5,
@@ -56,6 +63,9 @@ from gait.spatial import (
 # (dopamine, norepinephrine, serotonin, GABA, and the Penk/dynorphin neuropeptides), so they
 # support the same metabolite<->transcript concordance test as dopamine.
 PATHWAYS: dict[str, list[str]] = {
+    # broad multi-system set used for the manuscript figure (splits into striatal /
+    # cortical / GABAergic dominating components -- the right kind of set for region MI):
+    "neurotransmission": NEUROTRANSMISSION_GENES,
     "dopaminergic":  ["Drd1", "Drd2", "Adora2a", "Ppp1r1b", "Pde10a", "Gpr88", "Penk",
                       "Pdyn", "Rgs9", "Gnal", "Adcy5", "Tac1"],                  # (MSI: dopamine)
     "da_synthesis":  ["Th", "Slc6a3", "Slc18a2", "Ddc", "Nr4a2", "Pitx3"],      # SNc cell bodies
@@ -104,6 +114,28 @@ def sample_prefixes(names: list[str]) -> list[str]:
     return sorted(n[: -len(tag)] for n in names if n.endswith(tag))
 
 
+def striatum_auc(U: np.ndarray, region) -> tuple[float, float]:
+    """Best striatum-vs-rest AUC over the K component activities (with its MWU p).
+
+    A far more sensitive region-recovery test than the dominant-component MI: it asks
+    whether *any* component's activity separates the striatum, and at what AUC. Returns
+    (nan, nan) when no ``striatum`` annotation is present.
+    """
+    if region is None:
+        return np.nan, np.nan
+    y = np.asarray(region) == "striatum"
+    if y.sum() == 0 or (~y).sum() == 0:
+        return np.nan, np.nan
+    denom = y.sum() * (~y).sum()
+    best_auc, best_p = 0.0, np.nan
+    for k in range(U.shape[1]):
+        r = mannwhitneyu(U[y, k], U[~y, k], alternative="two-sided")
+        auc = max(r.statistic / denom, 1 - r.statistic / denom)   # direction-agnostic
+        if auc > best_auc:
+            best_auc, best_p = auc, r.pvalue
+    return float(best_auc), float(best_p)
+
+
 def process_sample(tar, names, prefix, wanted, K):
     """Fit GAIT on one section; return a summary dict (or None if unusable)."""
     pos = _member(names, prefix, "tissue_positions_list.csv")
@@ -122,15 +154,17 @@ def process_sample(tar, names, prefix, wanted, K):
     gidx, present = select_genes(exp.genes, symbols=wanted, case_insensitive=True)
     if len(present) < 3:
         return {"sample": label, "n_spots": exp.n_spots, "n_genes": len(present),
-                "mi": np.nan, "x": None}
+                "mi": np.nan, "auc": np.nan, "auc_p": np.nan, "x": None}
     Xs = per_gene_scale(library_normalize(exp.X)[:, gidx])
     res = LinearNMF(K, loss="kl", max_iter=500, random_state=0).fit(Xs)
     dom = dominant_component(res.U, res.V)
     mi = (region_mutual_information(dom, exp.region)
           if exp.region is not None else np.nan)
+    auc, auc_p = striatum_auc(res.U, exp.region)
     regions = sorted(set(exp.region)) if exp.region is not None else []
     return {"sample": label, "n_spots": exp.n_spots, "n_genes": len(present),
-            "mi": mi, "regions": regions, "x": exp.x, "y": exp.y, "dom": dom, "K": res.K}
+            "mi": mi, "auc": auc, "auc_p": auc_p, "regions": regions,
+            "x": exp.x, "y": exp.y, "dom": dom, "K": res.K}
 
 
 def main(tar_path: str, pathway: str, K: int) -> None:
@@ -151,20 +185,26 @@ def main(tar_path: str, pathway: str, K: int) -> None:
                 rows.append(r)
 
     usable = [r for r in rows if r.get("x") is not None]
-    print(f"\n{'section':<22}{'spots':>7}{'genes':>6}{'region MI (bits)':>18}")
+    print(f"\n{'section':<22}{'spots':>7}{'genes':>6}{'region MI':>11}{'striatum AUC':>14}")
     for r in rows:
-        mi = f"{r['mi']:.3f}" if r["mi"] == r["mi"] else "  n/a"
-        print(f"{r['sample']:<22}{r['n_spots']:>7}{r['n_genes']:>6}{mi:>18}")
+        mi = f"{r['mi']:.3f}" if r["mi"] == r["mi"] else "n/a"
+        auc = f"{r['auc']:.3f}" if r.get("auc") == r.get("auc") else "n/a"
+        print(f"{r['sample']:<22}{r['n_spots']:>7}{r['n_genes']:>6}{mi:>11}{auc:>14}")
     mis = [r["mi"] for r in usable if r["mi"] == r["mi"]]
+    aucs = [r["auc"] for r in usable if r.get("auc") == r.get("auc")]
     if mis:
-        print(f"\nregion MI across sections: median={np.median(mis):.3f} "
-              f"min={np.min(mis):.3f} max={np.max(mis):.3f}  (n={len(mis)})")
+        print(f"\nregion MI  : median={np.median(mis):.3f} "
+              f"[{np.min(mis):.3f}, {np.max(mis):.3f}]  (n={len(mis)})")
+    if aucs:
+        print(f"striatum AUC: median={np.median(aucs):.3f} "
+              f"[{np.min(aucs):.3f}, {np.max(aucs):.3f}]  (n={len(aucs)})")
 
     # CSV
     with open(f"robustness_{pathway}.csv", "w") as fh:
-        fh.write("sample,n_spots,n_genes,region_mi\n")
+        fh.write("sample,n_spots,n_genes,region_mi,striatum_auc,striatum_auc_p\n")
         for r in rows:
-            fh.write(f"{r['sample']},{r['n_spots']},{r['n_genes']},{r['mi']}\n")
+            fh.write(f"{r['sample']},{r['n_spots']},{r['n_genes']},{r['mi']},"
+                     f"{r.get('auc', float('nan'))},{r.get('auc_p', float('nan'))}\n")
 
     # Figure: grid of per-section dominant-component maps.
     if usable:
