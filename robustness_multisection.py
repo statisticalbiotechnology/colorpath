@@ -14,8 +14,11 @@ the rest of GAIT.
 Usage:
     python robustness_multisection.py [GSE232910_RAW.tar] [pathway] [K]
 
-    pathway is one of:  dopaminergic serotonergic noradrenergic gabaergic
-                        glutamatergic cholinergic myelination
+    pathway is one of:  dopaminergic da_synthesis msn neuropeptide serotonergic
+                        noradrenergic gabaergic glutamatergic cholinergic myelination
+    (msn = striatal medium-spiny-neuron direct/D1 vs indirect/D2 programmes; the
+     dopaminergic/msn/neuropeptide/serotonergic/noradrenergic/gabaergic sets each have a
+     metabolite measured by FMP-10, enabling a metabolite<->transcript comparison)
     (default tar: ~/Downloads/dopamine_mouse/GSE232910_RAW.tar; pathway: dopaminergic; K=5)
 
 Writes  robustness_<pathway>_maps.png  (a grid of per-section dominant-component maps) and
@@ -49,15 +52,23 @@ from gait.spatial import (
 )
 
 # Curated mouse-brain pathway gene sets (case-insensitive, so human caps match too).
+# Pathways marked (MSI) below have a metabolite measured by FMP-10 in the SMA dataset
+# (dopamine, norepinephrine, serotonin, GABA, and the Penk/dynorphin neuropeptides), so they
+# support the same metabolite<->transcript concordance test as dopamine.
 PATHWAYS: dict[str, list[str]] = {
     "dopaminergic":  ["Drd1", "Drd2", "Adora2a", "Ppp1r1b", "Pde10a", "Gpr88", "Penk",
-                      "Pdyn", "Rgs9", "Gnal", "Adcy5", "Tac1"],
+                      "Pdyn", "Rgs9", "Gnal", "Adcy5", "Tac1"],                  # (MSI: dopamine)
+    "da_synthesis":  ["Th", "Slc6a3", "Slc18a2", "Ddc", "Nr4a2", "Pitx3"],      # SNc cell bodies
+    "msn":           ["Drd1", "Tac1", "Pdyn", "Pcp4",                           # direct/D1
+                      "Drd2", "Penk", "Adora2a", "Cartpt",                      # indirect/D2
+                      "Gpr88", "Ppp1r1b", "Rgs9", "Pde10a"],   # striatal MSNs (D1 vs D2 split)
+    "neuropeptide":  ["Penk", "Pdyn", "Tac1", "Cartpt", "Pcp4", "Scg2"],        # (MSI: Penk, dynorphin)
     "serotonergic":  ["Tph2", "Slc6a4", "Htr1a", "Htr1b", "Htr2a", "Htr2c", "Fev",
-                      "Gch1", "Ddc", "Maoa", "Slc18a2"],
+                      "Gch1", "Ddc", "Maoa", "Slc18a2"],                        # (MSI: serotonin)
     "noradrenergic": ["Dbh", "Slc6a2", "Pnmt", "Th", "Ddc", "Slc18a2", "Adra1a",
-                      "Adra2a", "Adrb1"],
+                      "Adra2a", "Adrb1"],                                       # (MSI: norepinephrine)
     "gabaergic":     ["Gad1", "Gad2", "Slc32a1", "Gabra1", "Gabrb2", "Gabbr1", "Pvalb",
-                      "Sst", "Vip"],
+                      "Sst", "Vip"],                                            # (MSI: GABA)
     "glutamatergic": ["Slc17a7", "Slc17a6", "Grin1", "Grin2a", "Grin2b", "Gria1", "Gria2",
                       "Grm5", "Camk2a", "Satb2"],
     "cholinergic":   ["Chat", "Slc5a7", "Slc18a3", "Ache", "Chrm1", "Chrm2", "Chrm3",
