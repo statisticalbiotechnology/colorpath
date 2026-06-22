@@ -114,35 +114,46 @@ def sample_prefixes(names: list[str]) -> list[str]:
     return sorted(n[: -len(tag)] for n in names if n.endswith(tag))
 
 
-def striatum_auc(U: np.ndarray, region) -> tuple[float, float]:
-    """Best striatum-vs-rest AUC over the K component activities (with its MWU p).
+def region_auc(U: np.ndarray, region) -> tuple[float, float, object]:
+    """Best AUC over the K component activities for separating one region label from rest.
 
     A far more sensitive region-recovery test than the dominant-component MI: it asks
-    whether *any* component's activity separates the striatum, and at what AUC. Returns
-    (nan, nan) when no ``striatum`` annotation is present.
+    whether *any* component's activity separates a region, and at what AUC. Works for any
+    annotation — binary (striatum/not, intact/lesioned) uses the natural split; >2 labels
+    take the most separable one-vs-rest. Returns (auc, MWU p, label); (nan, nan, None) when
+    no usable annotation is present.
     """
     if region is None:
-        return np.nan, np.nan
-    y = np.asarray(region) == "striatum"
-    if y.sum() == 0 or (~y).sum() == 0:
-        return np.nan, np.nan
-    denom = y.sum() * (~y).sum()
-    best_auc, best_p = 0.0, np.nan
-    for k in range(U.shape[1]):
-        r = mannwhitneyu(U[y, k], U[~y, k], alternative="two-sided")
-        auc = max(r.statistic / denom, 1 - r.statistic / denom)   # direction-agnostic
-        if auc > best_auc:
-            best_auc, best_p = auc, r.pvalue
-    return float(best_auc), float(best_p)
+        return np.nan, np.nan, None
+    region = np.asarray(region)
+    labels = [v for v in np.unique(region) if v != ""]
+    if len(labels) < 2:
+        return np.nan, np.nan, None
+    candidates = labels if len(labels) > 2 else labels[:1]   # binary: one split suffices
+    best = (0.0, np.nan, None)
+    for lab in candidates:
+        y = region == lab
+        if y.sum() == 0 or (~y).sum() == 0:
+            continue
+        denom = y.sum() * (~y).sum()
+        for k in range(U.shape[1]):
+            r = mannwhitneyu(U[y, k], U[~y, k], alternative="two-sided")
+            auc = max(r.statistic / denom, 1 - r.statistic / denom)   # direction-agnostic
+            if auc > best[0]:
+                best = (auc, float(r.pvalue), lab)
+    return float(best[0]), best[1], best[2]
 
 
-def process_sample(tar, names, prefix, wanted, K):
-    """Fit GAIT on one section; return a summary dict (or None if unusable)."""
+def process_sample(tar, names, prefix, wanted, K, region_file="region.csv"):
+    """Fit GAIT on one section; return a summary dict (or None if unusable).
+
+    ``region_file`` is the annotation scored against ('region.csv' = striatum/not_striatum,
+    'lesion.csv' = intact/lesioned)."""
     pos = _member(names, prefix, "tissue_positions_list.csv")
     if pos is None:
         return None
     h5_name = prefix + "filtered_feature_bc_matrix.h5"
-    reg_name = _member(names, prefix, "region.csv")
+    reg_name = _member(names, prefix, region_file)
     label = prefix.strip("_").split("_", 1)[-1].replace("_RNA", "")
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -154,30 +165,34 @@ def process_sample(tar, names, prefix, wanted, K):
     gidx, present = select_genes(exp.genes, symbols=wanted, case_insensitive=True)
     if len(present) < 3:
         return {"sample": label, "n_spots": exp.n_spots, "n_genes": len(present),
-                "mi": np.nan, "auc": np.nan, "auc_p": np.nan, "x": None}
+                "mi": np.nan, "auc": np.nan, "auc_p": np.nan, "auc_label": None, "x": None}
     Xs = per_gene_scale(library_normalize(exp.X)[:, gidx])
     res = LinearNMF(K, loss="kl", max_iter=500, random_state=0).fit(Xs)
     dom = dominant_component(res.U, res.V)
     mi = (region_mutual_information(dom, exp.region)
           if exp.region is not None else np.nan)
-    auc, auc_p = striatum_auc(res.U, exp.region)
+    auc, auc_p, auc_label = region_auc(res.U, exp.region)
     regions = sorted(set(exp.region)) if exp.region is not None else []
     return {"sample": label, "n_spots": exp.n_spots, "n_genes": len(present),
-            "mi": mi, "auc": auc, "auc_p": auc_p, "regions": regions,
+            "mi": mi, "auc": auc, "auc_p": auc_p, "auc_label": auc_label, "regions": regions,
             "x": exp.x, "y": exp.y, "dom": dom, "K": res.K}
 
 
-def main(tar_path: str, pathway: str, K: int) -> None:
+def main(tar_path: str, pathway: str, K: int, region: str = "region") -> None:
     wanted = PATHWAYS[pathway]
+    region_file = f"{region}.csv"        # 'region' -> striatum/not; 'lesion' -> intact/lesioned
+    tag = f"{pathway}_{region}"
+    auc_hdr = "intact/les AUC" if region == "lesion" else "striatum AUC"
     with tarfile.open(tar_path) as tar:
         names = tar.getnames()
         nameset = set(names)
         prefixes = sample_prefixes(names)
-        print(f"[{pathway}] {len(prefixes)} sections in {os.path.basename(tar_path)}")
+        print(f"[{pathway} | annotation: {region_file}] {len(prefixes)} sections "
+              f"in {os.path.basename(tar_path)}")
         rows = []
         for pre in prefixes:
             try:
-                r = process_sample(tar, nameset, pre, wanted, K)
+                r = process_sample(tar, nameset, pre, wanted, K, region_file)
             except Exception as e:                       # keep going on a bad section
                 print(f"  ! {pre}: {type(e).__name__}: {e}")
                 continue
@@ -185,26 +200,27 @@ def main(tar_path: str, pathway: str, K: int) -> None:
                 rows.append(r)
 
     usable = [r for r in rows if r.get("x") is not None]
-    print(f"\n{'section':<22}{'spots':>7}{'genes':>6}{'region MI':>11}{'striatum AUC':>14}")
+    print(f"\n{'section':<22}{'spots':>7}{'genes':>6}{'MI':>9}{auc_hdr:>16}")
     for r in rows:
         mi = f"{r['mi']:.3f}" if r["mi"] == r["mi"] else "n/a"
         auc = f"{r['auc']:.3f}" if r.get("auc") == r.get("auc") else "n/a"
-        print(f"{r['sample']:<22}{r['n_spots']:>7}{r['n_genes']:>6}{mi:>11}{auc:>14}")
+        print(f"{r['sample']:<22}{r['n_spots']:>7}{r['n_genes']:>6}{mi:>9}{auc:>16}")
     mis = [r["mi"] for r in usable if r["mi"] == r["mi"]]
     aucs = [r["auc"] for r in usable if r.get("auc") == r.get("auc")]
     if mis:
-        print(f"\nregion MI  : median={np.median(mis):.3f} "
+        print(f"\nMI  : median={np.median(mis):.3f} "
               f"[{np.min(mis):.3f}, {np.max(mis):.3f}]  (n={len(mis)})")
     if aucs:
-        print(f"striatum AUC: median={np.median(aucs):.3f} "
+        print(f"AUC : median={np.median(aucs):.3f} "
               f"[{np.min(aucs):.3f}, {np.max(aucs):.3f}]  (n={len(aucs)})")
 
     # CSV
-    with open(f"robustness_{pathway}.csv", "w") as fh:
-        fh.write("sample,n_spots,n_genes,region_mi,striatum_auc,striatum_auc_p\n")
+    with open(f"robustness_{tag}.csv", "w") as fh:
+        fh.write("sample,n_spots,n_genes,mi,auc,auc_p,auc_label\n")
         for r in rows:
             fh.write(f"{r['sample']},{r['n_spots']},{r['n_genes']},{r['mi']},"
-                     f"{r.get('auc', float('nan'))},{r.get('auc_p', float('nan'))}\n")
+                     f"{r.get('auc', float('nan'))},{r.get('auc_p', float('nan'))},"
+                     f"{r.get('auc_label')}\n")
 
     # Figure: grid of per-section dominant-component maps.
     if usable:
@@ -220,24 +236,32 @@ def main(tar_path: str, pathway: str, K: int) -> None:
             ax.axis("on")
             ax.scatter(r["x"], r["y"], c=r["dom"], s=3, cmap=cmap,
                        vmin=-0.5, vmax=r["K"] - 0.5)
-            mi = f"{r['mi']:.2f}" if r["mi"] == r["mi"] else "n/a"
-            ax.set_title(f"{r['sample']}\nMI={mi}", fontsize=8)
+            auc = f"{r['auc']:.2f}" if r.get("auc") == r.get("auc") else "n/a"
+            ax.set_title(f"{r['sample']}\nAUC={auc}", fontsize=8)
             ax.set_aspect("equal"); ax.invert_yaxis(); ax.set_xticks([]); ax.set_yticks([])
-        fig.suptitle(f"GAIT dominant-component map — {pathway} pathway, KL-NMF (K={K}) "
-                     f"across {n} sections", fontweight="bold")
-        out = f"robustness_{pathway}_maps.png"
+        fig.suptitle(f"GAIT dominant-component map — {pathway} pathway vs {region}, "
+                     f"KL-NMF (K={K}) across {n} sections", fontweight="bold")
+        out = f"robustness_{tag}_maps.png"
         fig.savefig(out, dpi=150, bbox_inches="tight")
-        print(f"wrote {out} and robustness_{pathway}.csv")
+        print(f"wrote {out} and robustness_{tag}.csv")
 
 
 if __name__ == "__main__":
+    import argparse
+
     default_tar = os.path.expanduser("~/Downloads/dopamine_mouse/GSE232910_RAW.tar")
-    tar_path = sys.argv[1] if len(sys.argv) > 1 else default_tar
-    pathway = sys.argv[2] if len(sys.argv) > 2 else "dopaminergic"
-    K = int(sys.argv[3]) if len(sys.argv) > 3 else 5
-    if pathway not in PATHWAYS:
-        sys.exit(f"unknown pathway {pathway!r}; choose from {list(PATHWAYS)}")
+    ap = argparse.ArgumentParser(description="GAIT multi-section robustness over a GEO tar.")
+    ap.add_argument("tar", nargs="?", default=default_tar, help="GSE..._RAW.tar bundle")
+    ap.add_argument("pathway", nargs="?", default="dopaminergic",
+                    help=f"one of: {' '.join(PATHWAYS)}")
+    ap.add_argument("--region", choices=["region", "lesion"], default="region",
+                    help="annotation to score against: region=striatum/not, lesion=intact/lesioned")
+    ap.add_argument("--K", type=int, default=5, help="number of components")
+    args = ap.parse_args()
+    if args.pathway not in PATHWAYS:
+        sys.exit(f"unknown pathway {args.pathway!r}; choose from {list(PATHWAYS)}")
+    tar_path = args.tar
     if not os.path.exists(tar_path):
         print(__doc__)
         sys.exit(f"error: tar not found at {tar_path} (pass it as the first argument)")
-    main(tar_path, pathway, K)
+    main(tar_path, args.pathway, args.K, args.region)
