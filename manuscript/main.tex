@@ -311,6 +311,59 @@ blobs and the top-loading ions of each component were exactly the planted member
 unit-tested component-recovery check confirms that masking does not increase the
 off-component spread of the saturating ion relative to an unmasked baseline.
 
+\subsection{Log vs.\ linear: recovering the multiplicative coupling}
+\label{sec:benchmark}
+
+To test the central claim directly --- that a linear-space factorisation with a
+multiplicative-error loss recovers a pathway's multiplicative structure where the
+conventional log pipeline does not --- we planted $K = 3$ region-structured components, each
+multiplicatively coupling a group of features whose loadings span three orders of magnitude
+(so the log's dynamic-range compression is exercised), corrupted them with multiplicative
+Gamma noise, and asked five methods to recover the planted structure
+(Table~\ref{tab:benchmark}). Recovery of the spatial maps ($U$) and of the loadings ($V$) is
+scored as the mean absolute correlation between each recovered factor and its
+optimally-matched planted factor; \emph{region accuracy} is the accuracy of the per-location
+dominant-component map against the planted regions.
+
+The result isolates the two design choices. \textbf{Coupling fidelity (R2)} is read from
+$V$-recovery: every \emph{linear} method recovers the multiplicative loadings essentially
+perfectly ($\approx 1.00$), whereas $\log(1{+}x)$ before NMF drops to $0.79$ and before PCA to
+$0.54$. Tellingly, $\log(1{+}x){+}$NMF still recovers \emph{where} each component is active
+($U$-recovery $0.90$, region accuracy $0.96$) but not \emph{which} features couple or
+\emph{how strongly} ($V$-recovery $0.79$): the log leaves the spatial activity as a
+recoverable additive offset while degrading exactly the multiplicative loading structure that
+defines the pathway --- the precise failure anticipated in Section~\ref{sec:intro}.
+\textbf{Error-model matching (R1)} is read from the top rows: under multiplicative noise the
+Itakura--Saito loss is best (region accuracy $0.98$), and when the same experiment is re-run
+with Poisson (count) noise the ranking flips and KL leads ($U/V/\text{region} = 1.00/1.00/0.98$,
+IS falling to $0.84$) --- so the variance-vs-mean diagnostic (Section~\ref{sec:diagnostics})
+selects the better loss in each regime. The conventional $\log{+}$PCA baseline is worst on
+every comparable metric (for the signed, non-parts-based PCA factors a dominant-component map
+is ill-defined, so its region accuracy is not directly comparable; the $U/V$ correlations,
+$0.64/0.54$, are). The benchmark is reproducible with \code{python -m gait.benchmark}.
+
+\begin{table}[t]
+  \centering
+  \caption{Recovery of planted multiplicative, region-structured components under
+  multiplicative (Gamma) noise ($K=3$): mean $|\text{corr}|$ of each recovered factor to its
+  matched ground-truth factor (for $U$ and $V$), and dominant-component accuracy vs the
+  planted regions (higher is better). Linear methods recover the loadings $V$ essentially
+  perfectly; both log pipelines do not. \code{python -m gait.benchmark} regenerates this and
+  the Poisson-noise variant discussed in the text.}
+  \label{tab:benchmark}
+  \begin{tabular}{lccc}
+    \toprule
+    method & $U$-recovery & $V$-recovery & region acc. \\
+    \midrule
+    GAIT (IS)              & 0.99 & \textbf{1.00} & \textbf{0.98} \\
+    GAIT (KL)              & 0.96 & \textbf{1.00} & 0.96 \\
+    linear NMF (Frobenius) & 0.94 & \textbf{1.00} & 0.95 \\
+    $\log(1{+}x)$ + NMF    & 0.90 & 0.79 & 0.96 \\
+    $\log(1{+}x)$ + PCA    & 0.64 & 0.54 & 0.02 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \subsection{Real MALDI-MSI section (catecholamine/serotonin metabolites)}
 \label{sec:realdata}
 

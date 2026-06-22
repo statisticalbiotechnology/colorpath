@@ -27,6 +27,8 @@ gait/
                             #   Space Ranger .h5, case-insensitive gene-set select, library_normalize
                             #   (LINEAR depth correction, no log), per-gene scale, grid index,
                             #   co-expression edges, dominant_component (reuses the engine)
+  benchmark.py              # log-vs-linear recovery benchmark: planted multiplicative coupling,
+                            #   GAIT vs linear-NMF vs log1p+NMF/PCA; region mutual information
 pathway_viz.py              # backward-compatible shim (re-exports draw_pathway) + dopamine example
 demo_decomposition.py       # end-to-end synthetic pipeline (diagnostics -> Route 2 -> illustrate -> Route 1)
 demo_visium_plasma.py       # end-to-end on a Visium breast section: plasma-cell/Ig pathway
@@ -34,6 +36,7 @@ demo_visium_dopamine.py     # mouse-brain Visium: a neurotransmission pathway ->
                             #   components (linear counts + KL, no log) + dominant-component map
 tests/test_decomposition.py
 tests/test_spatial.py
+tests/test_benchmark.py
 ```
 
 **Spatial transcriptomics counts:** treat counts like the metabolites — stay in **linear**
