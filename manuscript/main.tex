@@ -99,40 +99,32 @@ distribution as pseudo-channels, and non-negativity supports biological interpre
 None of these components \emph{is} a pathway; the pathway interpretation is imposed
 afterwards by annotation and enrichment \citep{jones2014,wittmann2025}.
 
-We focus on a question logically prior to enrichment: \textbf{what should the factorisation
-optimise so that its components are faithful to how pathways and measurements actually
-behave?} Two properties of these data constrain the answer.
+Yet the dominant pathway-analysis paradigm asks a narrower question than the spatial setting
+invites. Over-representation analysis (ORA) tests whether a pathway's members are unexpectedly
+frequent among the features called differential, and gene-set enrichment analysis (GSEA)
+tests whether they are shifted coherently towards one end of a ranked list
+\citep{subramanian2005}; both are well validated for detecting a \emph{quantitative, overall}
+change in a pathway's regulation between conditions, and a decade of benchmarking has refined
+them for exactly that \citep{khatri2012}. But each reduces a pathway to a single enrichment
+statistic, and so cannot express \emph{how} a pathway is regulated --- which members carry the
+activity, and whether distinct sub-programmes of one pathway are active in distinct places. In
+a spatial context this is usually the question of interest: not whether a pathway is globally
+up or down, but how its activity is \emph{organised across the tissue}. Our mouse-brain
+example (Section~\ref{sec:spatial}) is precisely this case --- a single neurotransmission
+pathway whose \emph{dominating} sub-programme switches between striatum and cortex, a
+distinction no per-pathway enrichment score can represent.
 
-\paragraph{(R1) Measurement error is multiplicative.} Ion intensities are corrupted by
-gain/efficiency fluctuations that scale with signal: a measured value behaves like
-$x = \mu\,\varepsilon$ with multiplicative $\varepsilon > 0$, so error grows with abundance.
-Sequencing-count modalities share this signal-dependent character --- sampling (Poisson, and
-typically over-dispersed) noise whose variance grows with the mean. The conventional remedy
-is to take logarithms, after which the error is approximately
-additive and ordinary least-squares / PCA apply.
-
-\paragraph{(R2) Pathway coupling is multiplicative.} Membership in a common pathway means
-coordinated, \emph{proportional} change: if two features A and B (metabolites or
-transcripts, say) are co-regulated, doubling the local activity of the pathway scales both. In linear space a rank-1 component
-$u\,v^{\!\top}$ encodes precisely this --- the entry $u_p v_m$ is a per-pixel activity times
-a per-metabolite loading, a product. This is the structure we want a component to capture.
-
-The difficulty is that \textbf{the logarithm cannot serve R1 and R2 simultaneously.} Under
-a log transform the shared activity $s$ of a rank-1 pathway ($A = a\,s$, $B = b\,s$) becomes
-an \emph{additive} offset, $\log A = \log a + \log s$: the multiplicative coupling that
-defines the pathway is converted into additive-shared-log structure, a weaker and different
-statement. A linear factorisation of log-transformed data therefore studies the wrong
-object for R2, even as the log was introduced to fix R1. Conversely, staying in linear
-space to keep R2 intact leaves ordinary least squares mismatched to the multiplicative
-error of R1.
-
-\code{colorpath} resolves this rather than splitting the difference. It keeps the data in
-linear space --- so the outer product is genuine multiplicative coupling (R2) --- and
-obtains the multiplicative-error property (R1) from a \textbf{scale-invariant loss
-function} (Section~\ref{sec:route2}) instead of from a transform, satisfying both
-requirements simultaneously. On top of this fidelity term, an optional penalty
-(Section~\ref{sec:independence}) can drive the components toward ICA-style statistical
-independence without leaving the non-negative, multiplicative model.
+We therefore pose \emph{spatial pathway-activity analysis}: rather than score a pathway, we
+\emph{decompose} it into spatial components, each a \emph{where} (a tissue activity map)
+paired with a \emph{which} (a feature-loading vector), so that region-specific sub-programmes
+become first-class objects. Doing this faithfully turns on two properties of the data ---
+pathway coupling is \emph{multiplicative} (R2), and measurement error is
+\emph{multiplicative}/signal-dependent (R1) --- which together rule out the routine
+``log-transform then PCA'' recipe and instead call for a factorisation in linear space under a
+scale-invariant loss. We give that argument in full in the Supplementary Material
+(\code{supplement.tex}) and summarise the resulting method, \code{colorpath}, in
+Section~\ref{sec:methods}: a linear-space IS/KL non-negative factorisation, with optional
+saturation censoring and an optional ICA-style independence penalty.
 
 \section{Methods}
 \label{sec:methods}

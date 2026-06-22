@@ -5,8 +5,9 @@ component_*_image.svg
 route2_component_*.svg
 route1_component_*.svg
 
-# LaTeX build artifacts (manuscript/ — the PDF is rebuilt via `make`)
+# LaTeX build artifacts (manuscript/ — the PDFs are rebuilt via `make`)
 manuscript/main.pdf
+manuscript/supplement.pdf
 *.aux
 *.bbl
 *.blg

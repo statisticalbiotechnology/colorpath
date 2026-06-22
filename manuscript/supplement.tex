@@ -1,0 +1,73 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\renewcommand{\thesection}{S\arabic{section}}
+
+\title{Supplementary Material\\
+\large Design rationale for spatial pathway-activity analysis:\\
+the error-versus-coupling tension}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+This note gives the design rationale behind the linear-space, scale-invariant-loss
+factorisation summarised in the Methods of the main text. It motivates, from first
+principles, why a faithful spatial pathway-activity decomposition must \emph{not}
+log-transform the data, and what it should optimise instead.
+
+\section{Why a faithful decomposition cannot log-transform}
+\label{s:rationale}
+
+We ask a question logically prior to enrichment: \textbf{what should the factorisation
+optimise so that its components are faithful to how pathways and measurements actually
+behave?} Two properties of spatial-omics data constrain the answer; together they rule out
+the conventional ``log-transform, then PCA/NMF'' recipe.
+
+\paragraph{(R1) Measurement error is multiplicative.} Imaging-mass-spectrometry ion
+intensities are corrupted by gain/efficiency fluctuations that scale with signal: a measured
+value behaves like $x = \mu\,\varepsilon$ with multiplicative $\varepsilon > 0$, so error
+grows with abundance. Sequencing-count modalities share this signal-dependent character ---
+sampling (Poisson, and typically over-dispersed) noise whose variance grows with the mean.
+The conventional remedy is to take logarithms, after which the error is approximately additive
+and ordinary least-squares / PCA apply.
+
+\paragraph{(R2) Pathway coupling is multiplicative.} Membership in a common pathway means
+coordinated, \emph{proportional} change: if two features A and B (metabolites or transcripts,
+say) are co-regulated, doubling the local activity of the pathway scales both. In linear space
+a rank-1 component $u\,v^{\!\top}$ encodes precisely this --- the entry $u_p v_m$ is a
+per-location activity times a per-feature loading, a product. This is the structure we want a
+component to capture.
+
+\paragraph{The logarithm cannot serve R1 and R2 simultaneously.} Under a log transform the
+shared activity $s$ of a rank-1 pathway ($A = a\,s$, $B = b\,s$) becomes an \emph{additive}
+offset, $\log A = \log a + \log s$: the multiplicative coupling that defines the pathway is
+converted into additive-shared-log structure, a weaker and different statement. A linear
+factorisation of log-transformed data therefore studies the wrong object for R2, even as the
+log was introduced to fix R1. Conversely, staying in linear space to keep R2 intact leaves
+ordinary least squares mismatched to the multiplicative error of R1. The conventional pipeline
+thus contains an internal contradiction: the log can serve the error model \emph{or} the
+coupling model, but not both.
+
+\paragraph{Resolution.} \code{colorpath} resolves this rather than splitting the difference.
+It keeps the data in linear space --- so the outer product is genuine multiplicative coupling
+(R2) --- and obtains the multiplicative-error property (R1) from a \textbf{scale-invariant
+loss function} (the linear-space Itakura--Saito / Kullback--Leibler route described in the
+main-text Methods) instead of from a transform, satisfying both requirements simultaneously.
+On top of this fidelity term, an optional Hilbert--Schmidt independence penalty can drive the
+components toward ICA-style statistical independence without leaving the non-negative,
+multiplicative model. For spatial transcriptomics the same logic forbids the routine
+$\log(1+x)$ normalisation: counts are kept linear (a linear library-size correction only) and
+the KL/IS loss carries the error model, so the regional sub-programmes a pathway resolves into
+remain genuine multiplicative outer products.
+
+\end{document}
