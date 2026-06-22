@@ -17,3 +17,4 @@ bookkeeping to load such an export and feed it to the decomposition + illustrati
 """
 
 __all__ = ["decomposition", "illustration", "spatial"]
+__version__ = "0.1.0"

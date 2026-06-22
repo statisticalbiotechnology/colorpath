@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gait"
+version = "0.1.0"
+description = "GAIT — Graph + Activity Image over Tissue: multiplicatively-coherent spatial pathway-activity analysis for imaging mass spectrometry and spatial transcriptomics."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Lukas Käll", email = "lukas.kall@scilifelab.se" }]
+keywords = [
+    "spatial omics", "pathway analysis", "NMF", "imaging mass spectrometry",
+    "spatial transcriptomics", "Itakura-Saito",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "networkx>=3.0",
+]
+
+[project.optional-dependencies]
+# 10x Space Ranger .h5 loading (gait.spatial.load_visium_10x_h5)
+visium = ["h5py>=3.8"]
+# manuscript figure regeneration from the parquet IMS export (manuscript/make_figures.py)
+figures = ["pandas>=2.0", "pyarrow>=12"]
+
+[project.urls]
+Homepage = "https://github.com/statisticalbiotechnology/gait"
+Source = "https://github.com/statisticalbiotechnology/gait"
+
+[tool.setuptools.packages.find]
+include = ["gait*"]
+
+[tool.setuptools]
+py-modules = ["pathway_viz"]
