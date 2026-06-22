@@ -117,14 +117,24 @@ distinction no per-pathway enrichment score can represent.
 We therefore pose \emph{spatial pathway-activity analysis}: rather than score a pathway, we
 \emph{decompose} it into spatial components, each a \emph{where} (a tissue activity map)
 paired with a \emph{which} (a feature-loading vector), so that region-specific sub-programmes
-become first-class objects. Doing this faithfully turns on two properties of the data ---
-pathway coupling is \emph{multiplicative} (R2), and measurement error is
-\emph{multiplicative}/signal-dependent (R1) --- which together rule out the routine
-``log-transform then PCA'' recipe and instead call for a factorisation in linear space under a
-scale-invariant loss. We give that argument in full in the Supplementary Material
-(\code{supplement.tex}) and summarise the resulting method, \code{colorpath}, in
-Section~\ref{sec:methods}: a linear-space IS/KL non-negative factorisation, with optional
-saturation censoring and an optional ICA-style independence penalty.
+become first-class objects. What such a decomposition should optimise is fixed by two
+properties of the data that one conventional choice --- the log transform --- fatally
+entangles. \textbf{(R2)} Pathway coupling is \emph{multiplicative}: co-regulated features
+scale together, so a pathway is a rank-one outer product $u\,v^{\!\top}$ of a per-location
+activity and a per-feature loading. \textbf{(R1)} Measurement error is \emph{multiplicative}
+as well --- signal-dependent gain noise in mass spectrometry, sampling noise in sequencing
+--- which the field tames by taking logarithms, making the error additive so least squares
+applies. But the logarithm cannot serve both at once: because $\log(a\,s) = \log a + \log s$,
+it converts the shared multiplicative activity of a pathway into a mere \emph{additive}
+offset, so a linear factorisation of logged data no longer studies multiplicative coupling
+(R2) --- even though the log was taken only to fix the error (R1). \code{colorpath} resolves
+the conflict instead of splitting it: it keeps the data \emph{linear}, so the outer product
+remains genuine multiplicative coupling, and recovers the multiplicative-error property from a
+\emph{scale-invariant loss} (Itakura--Saito or Kullback--Leibler) rather than from a transform
+--- satisfying R1 and R2 simultaneously. We give the full argument in the Supplementary
+Material (\code{supplement.tex}); Section~\ref{sec:methods} develops the resulting method, a
+linear-space IS/KL non-negative factorisation with optional saturation censoring and an
+optional ICA-style independence penalty.
 
 \section{Methods}
 \label{sec:methods}
