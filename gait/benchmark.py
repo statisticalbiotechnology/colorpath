@@ -33,9 +33,11 @@ with region labels (e.g. the mouse-brain striatum annotation).
 from __future__ import annotations
 
 import numpy as np
+import scipy.sparse as sp
 from scipy.optimize import linear_sum_assignment
+from scipy.spatial import cKDTree
 
-from .decomposition import LinearNMF
+from .decomposition import LinearNMF, spatial_variation_explained
 
 EPS = 1e-9
 
@@ -168,6 +170,61 @@ def region_mutual_information(labels: np.ndarray, regions: np.ndarray) -> float:
     pa = P.sum(1, keepdims=True); pb = P.sum(0, keepdims=True)
     nz = P > 0
     return float(np.sum(P[nz] * np.log2(P[nz] / (pa @ pb)[nz])))
+
+
+def spatial_weights(coords: np.ndarray, k: int = 6):
+    """Row-normalised k-nearest-neighbour spatial weight matrix for the spots."""
+    coords = np.asarray(coords, dtype=float)
+    n = len(coords)
+    k = min(k, n - 1)
+    _, idx = cKDTree(coords).query(coords, k=k + 1)        # first neighbour is self
+    rows = np.repeat(np.arange(n), k)
+    cols = idx[:, 1:].ravel()
+    W = sp.csr_matrix((np.ones(n * k), (rows, cols)), shape=(n, n))
+    rs = np.asarray(W.sum(1)).ravel()
+    rs[rs == 0] = 1.0
+    return sp.diags(1.0 / rs) @ W                          # row-normalised -> S0 = n
+
+
+def morans_i(x: np.ndarray, W) -> float:
+    """Moran's I spatial autocorrelation of ``x`` under a row-normalised weight matrix
+    (in [-1, 1]; ~0 = no spatial structure, high = smooth contiguous domains)."""
+    z = np.asarray(x, dtype=float) - np.mean(x)
+    denom = float(z @ z)
+    if denom <= EPS:
+        return 0.0
+    return float(z @ (W @ z) / denom)                      # row-normalised => N/S0 = 1
+
+
+def regional_structure_score(U, V, coords, k_neighbors: int = 6) -> dict:
+    """Annotation-free score for how strongly a pathway's activity is *regionally* organised.
+
+    Decompose a pathway into K components (``U``, ``V``), then combine two ingredients on the
+    spot graph:
+
+    * **spatial coherence** -- the per-component Moran's I of the activity maps, weighted by
+      each component's share of the dominant-component map (so components that own real
+      territory count); rules out salt-and-pepper / intermixed signals.
+    * **domain diversity** -- the normalised entropy of the dominant-component label
+      distribution; ~0 when one program is dominant everywhere (globally uniform, not a
+      *regional difference*), ~1 when several programs each own a domain.
+
+    The product ``score = coherence * diversity`` is high only when the pathway forms several
+    spatially-coherent domains -- i.e. clear regional differences in activity. Returns a dict
+    with ``score``, ``coherence``, ``diversity`` and the per-component Moran's I.
+    """
+    U = np.asarray(U, dtype=float)
+    V = np.asarray(V, dtype=float)
+    K = U.shape[1]
+    W = spatial_weights(coords, k_neighbors)
+    dom = spatial_variation_explained(U, V).argmax(axis=1)
+    share = np.array([np.mean(dom == k) for k in range(K)])
+    morans = np.array([morans_i(U[:, k], W) for k in range(K)])
+    coherence = float(np.sum(share * np.clip(morans, 0, None)))
+    p = share[share > 0]
+    diversity = float(-(p * np.log(p)).sum() / np.log(K)) if K > 1 else 0.0
+    return {"score": coherence * diversity, "coherence": coherence,
+            "diversity": diversity, "morans_per_component": morans}
 
 
 def format_table(results: dict[str, dict[str, float]]) -> str:

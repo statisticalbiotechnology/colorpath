@@ -8,8 +8,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from gait.benchmark import (
+    morans_i,
+    regional_structure_score,
     region_mutual_information,
     run_synthetic_benchmark,
+    spatial_weights,
     synthetic_coupling_dataset,
 )
 
@@ -38,6 +41,37 @@ def test_linear_recovers_coupling_better_than_log():
     assert gait_v > 0.9
     assert gait_v > res["log1p + NMF"]["V_recovery"] + 0.1
     assert gait_v > res["log1p + PCA"]["V_recovery"] + 0.2
+
+
+def test_morans_i_smooth_vs_random():
+    side = 20
+    yy, xx = np.mgrid[0:side, 0:side]
+    coords = np.column_stack([xx.ravel(), yy.ravel()])
+    W = spatial_weights(coords, k=6)
+    smooth = xx.ravel().astype(float)                       # a spatial gradient
+    rng = np.random.default_rng(0)
+    noise = rng.standard_normal(side * side)
+    assert morans_i(smooth, W) > 0.8
+    assert abs(morans_i(noise, W)) < 0.2
+
+
+def test_regional_structure_score_domains_vs_intermixed():
+    side = 20
+    yy, xx = np.mgrid[0:side, 0:side]
+    coords = np.column_stack([xx.ravel(), yy.ravel()])
+    rng = np.random.default_rng(0)
+    P = side * side
+    left = (xx.ravel() < side / 2)
+    # Two spatially-segregated domains -> high regional structure.
+    U_dom = np.column_stack([left + 0.05 * rng.random(P), (~left) + 0.05 * rng.random(P)])
+    # Same marginal activity but spatially intermixed (salt-and-pepper) -> low.
+    perm = rng.permutation(P)
+    U_mix = U_dom[perm]
+    V = np.array([[1.0, 0.0, 0.5], [0.0, 1.0, 0.5]])
+    s_dom = regional_structure_score(U_dom, V, coords)["score"]
+    s_mix = regional_structure_score(U_mix, V, coords)["score"]
+    assert s_dom > s_mix
+    assert s_dom > 0.2
 
 
 def test_region_mutual_information_detects_alignment():
