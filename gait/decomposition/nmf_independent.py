@@ -1,12 +1,12 @@
 """
 nmf_independent.py — IS/KL NMF with an ICA-style mutual-information penalty.
 
-colorpath's Route 2 keeps the data in linear space (so ``UV`` is genuine multiplicative
+gait's Route 2 keeps the data in linear space (so ``UV`` is genuine multiplicative
 pathway coupling, R2) and gets the multiplicative-error model from a scale-invariant
 IS / KL loss (R1). But like any NMF it leaves the components *correlated*: nothing pushes
 component 2, 3, ... to be statistically independent the way ICA does.
 
-This module adds that independence while keeping both colorpath principles. We do **not**
+This module adds that independence while keeping both gait principles. We do **not**
 whiten-and-rotate (which would destroy non-negativity and the multiplicative outer-product
 structure); instead we keep the IS/KL-NMF fidelity term and add a penalty that targets
 mutual information directly:
@@ -194,7 +194,7 @@ def _data_loss_grad_U(X, U, V, loss, W):
 
 
 class IndependentNMF:
-    """IS/KL NMF with an ICA-style HSIC independence penalty (colorpath Route 2+).
+    """IS/KL NMF with an ICA-style HSIC independence penalty (gait Route 2+).
 
     Parameters
     ----------

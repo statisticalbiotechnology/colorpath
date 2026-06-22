@@ -32,12 +32,12 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from colorpath.decomposition import (
+from gait.decomposition import (
     LinearNMF,
     spatial_variation_explained,
     variation_explained,
 )
-from colorpath.illustration import (
+from gait.illustration import (
     CATECHOLAMINE_SEROTONIN_EDGES,
     CATECHOLAMINE_SEROTONIN_POSITIONS,
     draw_pathway,
@@ -138,9 +138,9 @@ def main_visium(matrix_h5: str, positions: str, regions: str | None = None):
     log), a neurotransmission pathway subset, KL/IS-NMF (loss by the variance-vs-mean
     diagnostic), and the per-spot dominant-component map (argmax of G).
     """
-    from colorpath.decomposition import variance_vs_mean
-    from colorpath.illustration import render_dominant_component
-    from colorpath.spatial import (
+    from gait.decomposition import variance_vs_mean
+    from gait.illustration import render_dominant_component
+    from gait.spatial import (
         dominant_component,
         library_normalize,
         load_visium_10x_h5,

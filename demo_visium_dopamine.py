@@ -1,7 +1,7 @@
 """
 demo_visium_dopamine.py — region-specific pathway components on a mouse-brain Visium section.
 
-Demonstrates colorpath on spatial transcriptomics *counts* the multiplicatively-coherent
+Demonstrates gait on spatial transcriptomics *counts* the multiplicatively-coherent
 way (the point of the package): the routine "log1p-normalise then PCA" conflates the
 multiplicative error model with the multiplicative coupling model exactly as for IMS, so
 instead we keep the counts in **linear** space (a linear library-size normalisation only)
@@ -30,9 +30,9 @@ import sys
 
 import numpy as np
 
-from colorpath.decomposition import LinearNMF, variance_vs_mean
-from colorpath.illustration import render_dominant_component
-from colorpath.spatial import (
+from gait.decomposition import LinearNMF, variance_vs_mean
+from gait.illustration import render_dominant_component
+from gait.spatial import (
     dominant_component,
     library_normalize,
     load_visium_10x_h5,

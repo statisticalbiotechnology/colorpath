@@ -2,4 +2,4 @@ numpy>=1.24
 scipy>=1.10
 matplotlib>=3.7
 networkx>=3.0
-h5py>=3.8  # optional: only for colorpath.spatial.load_visium_10x_h5 (10x Space Ranger .h5)
+h5py>=3.8  # optional: only for gait.spatial.load_visium_10x_h5 (10x Space Ranger .h5)

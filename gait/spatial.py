@@ -1,7 +1,7 @@
 """
-spatial.py — apply the colorpath decomposition engine to spatial transcriptomics.
+spatial.py — apply the gait decomposition engine to spatial transcriptomics.
 
-colorpath was written for imaging mass spectrometry (pixels x ions), but the maths is
+gait was written for imaging mass spectrometry (pixels x ions), but the maths is
 identical for **spatial transcriptomics** (Visium / Visium HD): a non-negative matrix
 
     X  in  R>=0^{P x M}        P spots (rows), M genes (columns)
@@ -9,7 +9,7 @@ identical for **spatial transcriptomics** (Visium / Visium HD): a non-negative m
                                V gene loadings  (one gene vector per component)
 
 so a rank-1 component is a *pathway/program activity* exactly as for IMS, and feeds the
-same illustration layer (:func:`colorpath.illustration.illustrate_component`):
+same illustration layer (:func:`gait.illustration.illustrate_component`):
 
     V[k, :]  -> pathway activity graph  (which genes load, coloured by loading share)
     U[:, k]  -> pathway activity image  (where the program is active over the tissue)
@@ -64,7 +64,7 @@ IG_PREFIXES = ("IGH", "IGK", "IGL")
 
 @dataclass
 class SpatialExport:
-    """A loaded spatial-transcriptomics export, ready for the colorpath engine.
+    """A loaded spatial-transcriptomics export, ready for the gait engine.
 
     Attributes
     ----------
@@ -251,7 +251,7 @@ def sample_grid(x: np.ndarray, y: np.ndarray) -> tuple[tuple[int, int], np.ndarr
     Maps integer spot coordinates onto the smallest enclosing rectangular grid. The
     returned ``pixel_index`` places each spot's score at the right grid cell (cells with no
     spot render blank), and is passed straight to
-    :func:`colorpath.illustration.render_pathway_activity_image`.
+    :func:`gait.illustration.render_pathway_activity_image`.
 
     Parameters
     ----------
@@ -361,8 +361,8 @@ def dominant_component(U: np.ndarray, V: np.ndarray, mode: str = "variance") -> 
     """Per-spot index of the pathway component that dominates the local signal.
 
     The argmax over components of the per-spot fraction-of-variation-explained
-    (:func:`colorpath.decomposition.spatial_variation_explained`). Rendered with
-    :func:`colorpath.illustration.render_dominant_component`, it segments the tissue by
+    (:func:`gait.decomposition.spatial_variation_explained`). Rendered with
+    :func:`gait.illustration.render_dominant_component`, it segments the tissue by
     *which* sub-programme of a pathway is locally strongest — e.g. a neurotransmission
     pathway over a brain section resolves into striatal vs. cortical vs. GABAergic
     territories, reconstructing anatomy from a single pathway.

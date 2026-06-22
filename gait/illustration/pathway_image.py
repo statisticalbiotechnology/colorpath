@@ -5,7 +5,7 @@ Companion to :func:`pathway_graph.draw_pathway`. Where the graph renders a compo
 spectral loading ``V[k, :]`` over the metabolite network, this renders a component's
 spatial score ``U[:, k]`` back onto the tissue: the per-pixel activity vector is
 reshaped to the acquisition grid ``(height, width)`` and drawn as a heatmap. Together
-the two objects are colorpath's full description of one pathway component.
+the two objects are gait's full description of one pathway component.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def render_dominant_component(
 
     Companion to :func:`render_pathway_activity_image`: instead of one component's
     continuous score, this scatters the tissue spots coloured by a categorical label —
-    typically :func:`colorpath.spatial.dominant_component` (the per-spot argmax of the
+    typically :func:`gait.spatial.dominant_component` (the per-spot argmax of the
     fraction-of-variation-explained). When a pathway is decomposed into K sub-programmes,
     this segments the tissue by which sub-programme is locally strongest, so a single
     pathway can reveal anatomically distinct regions.

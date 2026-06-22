@@ -1,5 +1,5 @@
 """
-demo_decomposition.py — end-to-end colorpath pipeline on synthetic IMS data.
+demo_decomposition.py — end-to-end gait pipeline on synthetic IMS data.
 
 Generates a small synthetic imaging-mass-spectrometry dataset with a known
 ground-truth pathway structure (two spatial activity regions, each multiplicatively
@@ -20,13 +20,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from colorpath.decomposition import (
+from gait.decomposition import (
     LinearNMF,
     LogLevelNMF,
     build_saturation_mask,
     variance_vs_mean,
 )
-from colorpath.illustration import illustrate_component
+from gait.illustration import illustrate_component
 
 
 def make_synthetic_ims(seed: int = 0):

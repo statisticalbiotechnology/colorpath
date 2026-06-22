@@ -1,10 +1,10 @@
 """
 pathway_graph.py — the pathway *activity graph* renderer.
 
-This is the original colorpath illustration code (formerly ``pathway_viz.draw_pathway``),
+This is the original gait illustration code (formerly ``pathway_viz.draw_pathway``),
 relocated unchanged into the package so the decomposition engine can reuse it as the
 visualisation layer. It draws a pathway as a directed graph with each metabolite node
-coloured by a scalar value — for colorpath this scalar is a component's spectral loading
+coloured by a scalar value — for gait this scalar is a component's spectral loading
 ``V[k, :]`` (the pathway activity graph). The root-level ``pathway_viz.py`` re-exports
 ``draw_pathway`` from here for backward compatibility.
 """

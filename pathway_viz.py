@@ -1,7 +1,7 @@
 """
 pathway_viz.py — backward-compatible entry point for the pathway activity graph.
 
-The renderer now lives in :mod:`colorpath.illustration.pathway_graph` (reused by the
+The renderer now lives in :mod:`gait.illustration.pathway_graph` (reused by the
 decomposition engine). This module re-exports ``draw_pathway`` so existing imports and
 ``python pathway_viz.py`` keep working, and retains the dopaminergic-pathway example.
 
@@ -11,7 +11,7 @@ Usage:
 See ``demo_decomposition.py`` for the full decomposition -> illustration pipeline.
 """
 
-from colorpath.illustration import draw_pathway
+from gait.illustration import draw_pathway
 
 __all__ = ["draw_pathway"]
 

@@ -1,6 +1,6 @@
-# CLAUDE.md — colorpath
+# CLAUDE.md — GAIT
 
-Guidance for working in this repository. `colorpath` does **pathway-activity analysis of
+Guidance for working in this repository. `GAIT` does **pathway-activity analysis of
 imaging mass spectrometry (IMS / MALDI-MSI)**: it decomposes an IMS image into pathway
 components and illustrates each one as a *pathway activity graph* (loadings over the
 metabolite network) and a *pathway activity image* (spatial scores over the tissue).
@@ -8,7 +8,7 @@ metabolite network) and a *pathway activity image* (spatial scores over the tiss
 ## Repository map
 
 ```
-colorpath/
+gait/
   __init__.py
   decomposition/            # the factorisation engine (this is the analysis core)
     losses.py               # frobenius / kl / is divergences + masked variants
@@ -48,7 +48,7 @@ conflation the package exists to avoid.
 - Public API is small and stable: a `fit(...)` returning `U`, `V` (linear, Route 2) or
   `g`, `p` (asinh, Route 1), plus the fitted mask and diagnostics, all feeding the
   existing illustration renderers. Keep new decomposition code under
-  `colorpath/decomposition/`; **reuse `colorpath/illustration/`, do not rewrite it.**
+  `gait/decomposition/`; **reuse `gait/illustration/`, do not rewrite it.**
 - Match the surrounding docstring style (NumPy-ish, parameter blocks) and keep modules
   importable without side effects.
 - Figures are output artifacts — do not commit `*.svg`/`*.png` produced by demos/tests.
@@ -67,7 +67,7 @@ python pathway_viz.py             # original dopamine-pathway illustration (stil
 # Pathway-activity decomposition of imaging mass spectrometry
 
 The sections below are the scientific design the decomposition engine implements. The
-illustration layer (`colorpath/illustration/`) is the visualisation layer for the two
+illustration layer (`gait/illustration/`) is the visualisation layer for the two
 vectors each component produces — reuse it.
 
 ## 1. Scientific context and goal
@@ -83,9 +83,9 @@ X ≈ U V                    U ∈ R≥0^{P × K}  spatial scores  (one image pe
 Each rank-1 component `U[:,k] ⊗ V[k,:]` is interpreted as a **pathway**:
 
 - `V[k,:]` — the **pathway activity graph** (which metabolites belong / how they load) →
-  `colorpath.illustration.draw_pathway`,
+  `gait.illustration.draw_pathway`,
 - `U[:,k]` — the **pathway activity image** (where in the tissue the pathway is active) →
-  `colorpath.illustration.render_pathway_activity_image`.
+  `gait.illustration.render_pathway_activity_image`.
 
 `illustrate_component` renders both from a fitted result. Because metabolite concentrations
 span orders of magnitude, colouring graph nodes by the raw loading `V[k,:]` looks near-binary

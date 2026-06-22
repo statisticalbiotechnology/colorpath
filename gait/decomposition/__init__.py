@@ -1,5 +1,5 @@
 """
-colorpath.decomposition — pathway-activity decomposition engine for imaging MS.
+gait.decomposition — pathway-activity decomposition engine for imaging MS.
 
 Factorises a non-negative IMS matrix ``X (P pixels x M ions) ~= U V`` into K rank-1
 components, each interpreted as a pathway:
@@ -7,8 +7,8 @@ components, each interpreted as a pathway:
     V[k, :]  pathway activity graph  (which metabolites load, how strongly)
     U[:, k]  pathway activity image  (where in the tissue the pathway is active)
 
-These two vectors per component feed the existing colorpath illustration layer
-(``colorpath.illustration``).
+These two vectors per component feed the existing gait illustration layer
+(``gait.illustration``).
 
 Two complementary routes resolve the error-model vs coupling-model tension (see the
 project CLAUDE.md):

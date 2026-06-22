@@ -22,7 +22,7 @@ how the factors are normalised.
 Because NMF components are not in general orthogonal, the per-component variances do not
 exactly partition the metabolite's total variance (cross terms are dropped); ``F`` is
 therefore a normalised *share* among components, exact in the independent-component limit
-(see :class:`~colorpath.decomposition.nmf_independent.IndependentNMF`).
+(see :class:`~gait.decomposition.nmf_independent.IndependentNMF`).
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ def loading_share(
     abundant structural genes) keeps a visible share instead of collapsing to ~0. This
     makes membership graphs far more readable when one component is dominated by a handful
     of very abundant features — use ``graph_value="loading_share"`` in
-    :func:`colorpath.illustration.illustrate_component`.
+    :func:`gait.illustration.illustrate_component`.
 
     Parameters
     ----------
@@ -140,7 +140,7 @@ def spatial_variation_explained(
     -------
     G : (P, K) array in ``[0, 1]``; with ``normalize="sum"`` each pixel's row sums to 1.
         ``G[:, k]`` is the per-pixel share map for component ``k`` and can be rendered with
-        :func:`colorpath.illustration.render_pathway_activity_image` directly.
+        :func:`gait.illustration.render_pathway_activity_image` directly.
     """
     return variation_explained(
         np.asarray(V, dtype=float).T, np.asarray(U, dtype=float).T,

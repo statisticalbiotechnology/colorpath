@@ -1,7 +1,7 @@
 """
 losses.py — divergences for non-negative matrix factorisation, with masked variants.
 
-These implement the three loss functions referenced by the colorpath decomposition
+These implement the three loss functions referenced by the gait decomposition
 engine (see CLAUDE.md §"Route 2"):
 
     frobenius : D(x, y) = (x - y)^2 / 2          (additive Gaussian error)
@@ -15,7 +15,7 @@ saturation: saturated ``(pixel, ion)`` entries are given weight 0 so they do not
 contribute to the fit.
 
 The IS divergence is *scale invariant* — ``D_IS(λx, λy) = D_IS(x, y)`` — which is the
-property colorpath wants for multiplicative measurement error. KL has variance ∝ mean
+property gait wants for multiplicative measurement error. KL has variance ∝ mean
 (shot noise); Frobenius has constant variance (the conventional, and for IMS usually
 wrong, assumption).
 """
@@ -74,7 +74,7 @@ def is_loss(X: np.ndarray, Y: np.ndarray, W: np.ndarray | None = None) -> float:
 
 #: Public registry mapping the ``loss=`` keyword used across the decomposition API to
 #: the scalar divergence function. The matching multiplicative-update rules live in
-#: :mod:`colorpath.decomposition.nmf_linear`.
+#: :mod:`gait.decomposition.nmf_linear`.
 LOSSES = {
     "frobenius": frobenius_loss,
     "kl": kl_loss,

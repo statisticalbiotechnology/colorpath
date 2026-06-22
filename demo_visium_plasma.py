@@ -1,8 +1,8 @@
 """
-demo_visium_plasma.py — colorpath on a Visium (spatial transcriptomics) breast section.
+demo_visium_plasma.py — gait on a Visium (spatial transcriptomics) breast section.
 
 Reuses the IMS decomposition engine to pull a **plasma-cell / immunoglobulin pathway**
-out of a human breast-cancer Visium HD export and render both colorpath views:
+out of a human breast-cancer Visium HD export and render both gait views:
 
     load export            -> spots x genes matrix + coordinates
     select gene set        -> plasma-cell markers + immunoglobulin loci
@@ -15,10 +15,10 @@ out of a human breast-cancer Visium HD export and render both colorpath views:
 The data lives wherever you downloaded it; point the demo at that folder:
 
     python demo_visium_plasma.py /path/to/tmp_BC_all_genes
-    # or:  COLORPATH_VISIUM_DIR=/path/to/tmp_BC_all_genes python demo_visium_plasma.py
+    # or:  GAIT_VISIUM_DIR=/path/to/tmp_BC_all_genes python demo_visium_plasma.py
 
 The export is expected to contain gene_names_*.txt, a *.csr.npz (or *.mtx) counts matrix,
-spot_barcodes.txt and spatial_coordinates.csv (see :mod:`colorpath.spatial`).
+spot_barcodes.txt and spatial_coordinates.csv (see :mod:`gait.spatial`).
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ import sys
 
 import numpy as np
 
-from colorpath.decomposition import LinearNMF
-from colorpath.illustration import illustrate_component
-from colorpath.spatial import (
+from gait.decomposition import LinearNMF
+from gait.illustration import illustrate_component
+from gait.spatial import (
     coexpression_edges,
     load_spatial_export,
     per_gene_scale,
@@ -92,10 +92,10 @@ def main(directory: str, n_components: int = 5, marker: str = "IGKC") -> None:
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("COLORPATH_VISIUM_DIR")
+    path = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GAIT_VISIUM_DIR")
     if not path:
         print(__doc__)
         print("error: pass the export directory as an argument or set "
-              "COLORPATH_VISIUM_DIR.")
+              "GAIT_VISIUM_DIR.")
         sys.exit(0)
     main(path)

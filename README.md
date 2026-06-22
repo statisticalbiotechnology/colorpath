@@ -1,8 +1,8 @@
-# colorpath
+# GAIT
 
 Pathway-activity analysis of imaging mass spectrometry (IMS / MALDI-MSI).
 
-`colorpath` decomposes an IMS image `X` (pixels × m/z) into `K` pathway components
+`GAIT` decomposes an IMS image `X` (pixels × m/z) into `K` pathway components
 `X ≈ U V`, then illustrates each component as a **pathway activity graph** (the spectral
 loading `V[k,:]` coloured over a metabolite network) and a **pathway activity image**
 (the spatial score `U[:,k]` reshaped onto the tissue).
@@ -28,8 +28,8 @@ pip install -r requirements.txt
 ## Use
 
 ```python
-from colorpath.decomposition import LinearNMF, build_saturation_mask, variance_vs_mean
-from colorpath.illustration import illustrate_component
+from gait.decomposition import LinearNMF, build_saturation_mask, variance_vs_mean
+from gait.illustration import illustrate_component
 
 mask, _ = build_saturation_mask(X, auto_detect=True)        # censor saturated ions
 loss = variance_vs_mean(X).recommended_loss                 # "is" or "kl"

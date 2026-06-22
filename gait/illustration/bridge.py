@@ -9,8 +9,8 @@ A fitted component is the pair ``(U[:, k], V[k, :])``:
 
 :func:`illustrate_component` maps one component to both renderers in one call, handling
 the bookkeeping (column-name -> loading dict, score column -> grid). It accepts either a
-:class:`~colorpath.decomposition.nmf_linear.LinearNMFResult` (Route 2) or a
-:class:`~colorpath.decomposition.nmf_loglevel.LogLevelNMFResult` (Route 1), or raw
+:class:`~gait.decomposition.nmf_linear.LinearNMFResult` (Route 2) or a
+:class:`~gait.decomposition.nmf_loglevel.LogLevelNMFResult` (Route 1), or raw
 ``U``/``V`` arrays.
 """
 

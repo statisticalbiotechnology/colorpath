@@ -1,4 +1,4 @@
-"""Tests for the colorpath decomposition engine and illustration bridge."""
+"""Tests for the gait decomposition engine and illustration bridge."""
 
 import os
 import sys
@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from colorpath.decomposition import (
+from gait.decomposition import (
     IndependentNMF,
     LinearNMF,
     LogLevelNMF,
@@ -26,7 +26,7 @@ from colorpath.decomposition import (
     variation_explained,
     spatial_variation_explained,
 )
-from colorpath.decomposition.saturation import detect_saturation_ceiling
+from gait.decomposition.saturation import detect_saturation_ceiling
 
 
 # ----------------------------- fixtures -----------------------------

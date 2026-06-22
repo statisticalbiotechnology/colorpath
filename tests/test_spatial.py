@@ -14,9 +14,9 @@ import scipy.sparse as sp
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from colorpath.decomposition import LinearNMF, loading_share, variation_explained
-from colorpath.illustration import illustrate_component, render_dominant_component
-from colorpath.spatial import (
+from gait.decomposition import LinearNMF, loading_share, variation_explained
+from gait.illustration import illustrate_component, render_dominant_component
+from gait.spatial import (
     coexpression_edges,
     dominant_component,
     library_normalize,

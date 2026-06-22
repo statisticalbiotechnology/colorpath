@@ -2,7 +2,7 @@
 saturation.py — detector-saturation ceiling detection and mask construction.
 
 High-abundance ions saturate the detector; the clipped intensity then reappears in
-components 2/3 of a naive factorisation as spurious "compensation". colorpath handles
+components 2/3 of a naive factorisation as spurious "compensation". gait handles
 this by treating saturated ``(pixel, ion)`` entries as *right-censored* via a binary
 weight matrix ``W in {0, 1}^{P x M}`` passed to the masked NMF (see ``nmf_linear``).
 

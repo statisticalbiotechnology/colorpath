@@ -46,7 +46,7 @@ error. We argue this conventional pipeline contains an internal contradiction: a
 can serve the \emph{error model} (turning multiplicative measurement noise into additive
 noise that least squares handles) \emph{or} the \emph{coupling model} (preserving the
 multiplicative co-regulation that defines a pathway), but not both. We present
-\code{colorpath}, a framework for \emph{spatial pathway-activity analysis} built around
+\code{GAIT}, a framework for \emph{spatial pathway-activity analysis} built around
 this distinction. It performs
 Itakura--Saito (IS) or Kullback--Leibler (KL) NMF in \emph{linear} space, so each rank-1
 component is literally a multiplicative outer product (coupling preserved) while a
@@ -127,7 +127,7 @@ as well --- signal-dependent gain noise in mass spectrometry, sampling noise in 
 applies. But the logarithm cannot serve both at once: because $\log(a\,s) = \log a + \log s$,
 it converts the shared multiplicative activity of a pathway into a mere \emph{additive}
 offset, so a linear factorisation of logged data no longer studies multiplicative coupling
-(R2) --- even though the log was taken only to fix the error (R1). \code{colorpath} resolves
+(R2) --- even though the log was taken only to fix the error (R1). \code{GAIT} resolves
 the conflict instead of splitting it: it keeps the data \emph{linear}, so the outer product
 remains genuine multiplicative coupling, and recovers the multiplicative-error property from a
 \emph{scale-invariant loss} (Itakura--Saito or Kullback--Leibler) rather than from a transform
@@ -587,11 +587,11 @@ exposing the isomer ambiguity that any honest pathway labelling must confront.
 \section*{Methods availability}
 
 The decomposition engine, illustration layer, diagnostics, synthetic-data demo, and unit
-tests are implemented in the \code{colorpath} package (\code{colorpath/decomposition/},
-\code{colorpath/illustration/}). The end-to-end pipeline of Section~\ref{sec:results} is
+tests are implemented in the \code{GAIT} package (\code{gait/decomposition/},
+\code{gait/illustration/}). The end-to-end pipeline of Section~\ref{sec:results} is
 reproduced by \code{demo\_decomposition.py}; design details are documented in
 \code{CLAUDE.md}. The spatial-transcriptomics extension (Section~\ref{sec:spatial}) lives in
-\code{colorpath/spatial.py} (10x Space~Ranger \code{.h5} loading, linear library-size
+\code{gait/spatial.py} (10x Space~Ranger \code{.h5} loading, linear library-size
 normalisation, gene-set selection, and the dominant-component view) and is reproduced by
 \code{demo\_visium\_dopamine.py}.
 

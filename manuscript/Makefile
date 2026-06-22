@@ -1,4 +1,4 @@
-# Makefile for the colorpath manuscript.
+# Makefile for the GAIT manuscript.
 #
 #   make            build main.pdf and supplement.pdf
 #   make figures    regenerate figures/ from a parquet (set DATA=...)

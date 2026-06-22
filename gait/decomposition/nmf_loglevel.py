@@ -94,7 +94,7 @@ def _equalise(p_row: np.ndarray, alpha: float, active_frac: float) -> np.ndarray
 
 
 class LogLevelNMF:
-    """asinh-space equal-loading constrained NMF (colorpath Route 1).
+    """asinh-space equal-loading constrained NMF (gait Route 1).
 
     Parameters
     ----------

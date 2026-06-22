@@ -1,7 +1,7 @@
 """
 nmf_linear.py — Route 2 (PRIMARY): masked NMF in linear space.
 
-This is the core colorpath decomposition engine. It factorises a non-negative
+This is the core gait decomposition engine. It factorises a non-negative
 imaging-mass-spectrometry matrix
 
     X  in  R>=0^{P x M}        P pixels (rows), M metabolites/ions (columns)
@@ -9,7 +9,7 @@ imaging-mass-spectrometry matrix
                                V in R>=0^{K x M}   spectral loadings (pathway graphs)
 
 *in linear space* so that each rank-1 component ``U[:, k] (x) V[k, :]`` is literally the
-multiplicative pathway coupling colorpath models (requirement R2 in CLAUDE.md). The
+multiplicative pathway coupling gait models (requirement R2 in CLAUDE.md). The
 multiplicative-error property (R1) comes from the *loss*, not from a log transform:
 
     loss="is"   Itakura-Saito  -> multiplicative Gamma gain noise (variance ∝ mean^2)
@@ -17,7 +17,7 @@ multiplicative-error property (R1) comes from the *loss*, not from a log transfo
     loss="frobenius"           -> additive Gaussian noise (the conventional baseline)
 
 Pick ``is`` vs ``kl`` empirically with the variance-vs-mean diagnostic
-(:func:`colorpath.decomposition.diagnostics.variance_vs_mean`).
+(:func:`gait.decomposition.diagnostics.variance_vs_mean`).
 
 Detector saturation is handled by a binary weight matrix ``W in {0, 1}^{P x M}`` that
 zeroes out saturated ``(pixel, ion)`` entries (right-censoring). The mask is carried
@@ -154,7 +154,7 @@ def _fit_single(X, K, loss, W, max_iter, tol, rng, warm_start_iter, init_UV):
 
 
 class LinearNMF:
-    """Masked IS / KL / Frobenius NMF in linear space (colorpath Route 2).
+    """Masked IS / KL / Frobenius NMF in linear space (gait Route 2).
 
     Parameters
     ----------
@@ -169,8 +169,8 @@ class LinearNMF:
     Notes
     -----
     Outputs ``U`` (pathway activity images) and ``V`` (pathway activity graphs) are on
-    interpretable linear-abundance units, ready for the existing colorpath illustration
-    layer (see :func:`colorpath.illustration.bridge.illustrate_component`).
+    interpretable linear-abundance units, ready for the existing gait illustration
+    layer (see :func:`gait.illustration.bridge.illustrate_component`).
     """
 
     def __init__(
@@ -204,7 +204,7 @@ class LinearNMF:
         ----------
         X    : (P, M) non-negative data matrix (pixels x ions).
         mask : optional (P, M) weight matrix; binary {0,1} censors saturated entries.
-               See :mod:`colorpath.decomposition.saturation` for construction.
+               See :mod:`gait.decomposition.saturation` for construction.
         init : optional ``(U, V)`` warm start (e.g. a previous fit). When given,
                ``n_init`` is forced to 1.
         """
