@@ -50,14 +50,17 @@ from robustness_multisection import _extract, _member, sample_prefixes
 
 
 def read_gmt(path: str) -> dict[str, list[str]]:
-    """Parse a GMT gene-set file (name <tab> description <tab> gene1 <tab> ...)."""
+    """Parse a GMT gene-set file (name <tab> description <tab> gene1 <tab> ...).
+
+    Tolerates weighted tokens (``GENE,1.0`` -> ``GENE``), as some Enrichr/MSigDB exports use.
+    """
     opener = gzip.open if path.endswith(".gz") else open
     sets: dict[str, list[str]] = {}
     with opener(path, "rt") as fh:
         for line in fh:
             parts = line.rstrip("\n").split("\t")
             if len(parts) >= 3:
-                sets[parts[0]] = [g for g in parts[2:] if g]
+                sets[parts[0]] = [g.split(",")[0].strip() for g in parts[2:] if g.strip()]
     return sets
 
 
