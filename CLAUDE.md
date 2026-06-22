@@ -34,6 +34,7 @@ demo_decomposition.py       # end-to-end synthetic pipeline (diagnostics -> Rout
 demo_visium_plasma.py       # end-to-end on a Visium breast section: plasma-cell/Ig pathway
 demo_visium_dopamine.py     # mouse-brain Visium: a neurotransmission pathway -> region-specific
                             #   components (linear counts + KL, no log) + dominant-component map
+robustness_multisection.py  # run a pathway across all GEO _RAW.tar sections; region MI per section
 tests/test_decomposition.py
 tests/test_spatial.py
 tests/test_benchmark.py
