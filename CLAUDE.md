@@ -28,16 +28,20 @@ gait/
                             #   (LINEAR depth correction, no log), per-gene scale, grid index,
                             #   co-expression edges, dominant_component (reuses the engine)
   benchmark.py              # log-vs-linear recovery benchmark: planted multiplicative coupling,
-                            #   GAIT vs linear-NMF vs log1p+NMF/PCA; region mutual information
+                            #   GAIT vs linear-NMF vs log1p+NMF/PCA; region mutual information;
+                            #   regional_structure_score (coherence x diversity) + direction term
 pathway_viz.py              # backward-compatible shim (re-exports draw_pathway) + dopamine example
 demo_decomposition.py       # end-to-end synthetic pipeline (diagnostics -> Route 2 -> illustrate -> Route 1)
 demo_visium_plasma.py       # end-to-end on a Visium breast section: plasma-cell/Ig pathway
 demo_visium_dopamine.py     # mouse-brain Visium: a neurotransmission pathway -> region-specific
                             #   components (linear counts + KL, no log) + dominant-component map
-robustness_multisection.py  # run a pathway across all GEO _RAW.tar sections; region MI per section
+robustness_multisection.py  # run a pathway across all GEO _RAW.tar sections; striatum/lesion AUC per section
+scan_pathways.py            # annotation-free screen: rank every pathway in a .gmt (KEGG) by
+                            #   regional_structure_score on one or many Visium sections
 tests/test_decomposition.py
 tests/test_spatial.py
 tests/test_benchmark.py
+tests/test_scan.py
 ```
 
 **Spatial transcriptomics counts:** treat counts like the metabolites — stay in **linear**
@@ -270,3 +274,117 @@ multiplicatively-correct, saturation-aware factorisation** (ranking ions by load
 spatial factor k). Saturation handling via a censored/masked NMF loss is a practical
 novelty in this combination. Frame the contribution as the *pipeline and its statistical
 coherence*, not any single algorithm.
+
+---
+
+# 7. Project state & cross-modality continuation (read this to resume in a new thread)
+
+This section is the **handoff**: where the project stands and exactly what to do when the
+matched MALDI-MSI metabolite data arrives. Everything below is committed on the dev branch
+`claude/peaceful-mendel-efv8ps`; `main` is fast-forwarded from there by hand.
+
+## 7.1 What is done
+
+- **Engine + illustration**: Routes 1/2/2+ as in §§2–3; tests green (`pytest tests/ -q`).
+- **Spatial-transcriptomics extension** (`gait/spatial.py`): Visium / 10x Space Ranger `.h5`
+  loaders, gene-set select (case-insensitive), `library_normalize` (LINEAR depth correction —
+  **never `log1p`**), `per_gene_scale`, `dominant_component`. Counts are treated exactly like
+  metabolites: linear space + KL/IS loss.
+- **Log-vs-linear benchmark** (`gait/benchmark.py`, `run_synthetic_benchmark`): formalises the
+  R1/R2 claim — GAIT (KL/IS on linear X) recovers planted multiplicative coupling better than
+  `log1p`+NMF/PCA. Table `tab:benchmark` in the manuscript.
+- **Cross-section robustness** (`robustness_multisection.py`): a pathway run across all GEO
+  `GSE232910` sections, scored by best **striatum-vs-rest AUC** (or **intact-vs-lesioned** with
+  `--region lesion`) over `K=5` components. Striatal systems (dopaminergic 0.90, broad
+  neurotransmission 0.95, GABAergic 0.72) localise reproducibly; non-striatal (serotonergic
+  0.62, noradrenergic 0.53) sit at chance — *specificity* is the evidence.
+- **Annotation-free pathway scan** (`scan_pathways.py`): ranks every KEGG gene set by
+  `regional_structure_score` = **coherence x diversity** (dominant-share-weighted Moran's I of
+  component activities, times entropy of the dominant-component map). `--match V11L12`
+  aggregates by median score/rank over the eight striatal sections. The unsupervised scan
+  reproduces the supervised ordering (synaptic / neuro-signalling pathways on top).
+- **Magnitude-vs-direction**: `regional_structure_score` also returns `direction` =
+  `1 - max_{i<j} cos(V_i, V_j)` over the components that own territory (see
+  `loading_direction_distinctness`). It is scale-invariant in gene space and separates "the
+  pathway is merely *more abundant* in a region" (a magnitude gradient NMF carved into
+  near-collinear components; `direction ~ 0`) from "the pathway runs a *different program*
+  there" (different gene composition; `direction -> 1`). On the striatal scan the top hits sit
+  at an **intermediate** 0.3–0.5: real but moderate compositional structure on top of an
+  abundance contrast. This is the honest framing in the manuscript.
+
+## 7.2 The dataset and the open question
+
+The data is **Vicari et al., Spatial Multimodal Analysis (SMA), *Nat. Biotechnol.* 2023**: the
+same mouse-brain sections measured by **MALDI-MSI** (FMP-10 derivatisation, which charge-tags
+monoamines/amino acids — dopamine, L-DOPA, 3-MT, DOPAC, HVA, norepinephrine, 5-HT, GABA,
+glutamate…) **and** by **Visium** spatial transcriptomics, in a 6-OHDA unilateral Parkinson's
+model. We have analysed only the **transcriptomic** side so far (GEO `GSE232910`).
+
+**The headline prediction (the reason for the cross-modality step).** On transcripts the
+dopaminergic programme localises cleanly to the striatum but is at **chance on the
+intact-vs-lesioned axis** (`--region lesion`, AUC ≈ 0.55): 6-OHDA depletes the *metabolite*
+dopamine in the lesioned hemisphere but leaves the receptor *transcripts* (`Drd1`/`Drd2`)
+largely intact, so the transcriptomic programme cannot see the lesion. GAIT therefore predicts
+that the **dopamine-metabolite component (MSI) should separate the lesioned hemisphere where
+the transcript component does not** — a transcript-vs-metabolite dissociation only a multimodal
+measurement resolves. Confirming this on the FMP-10 data is the manuscript's payoff and decides
+the journal tier. Until then the relevant manuscript subsection is fenced as **PROVISIONAL**
+(`%% ---- PROVISIONAL ... %% ---- end PROVISIONAL ----` around `sec:robustness` in
+`manuscript/main.tex`).
+
+## 7.3 When Fei's parquet arrives — the plan
+
+We have asked Fei for the **dopaminergic part of the IMS data as a parquet** (see §7.4 for the
+schema). To resume in a fresh thread:
+
+1. **Write a loader** `load_msi_parquet(path) -> SpatialExport`-like object in `gait/spatial.py`
+   (mirror `SpatialExport`: `X` = pixels × metabolites linear intensities, `genes` -> metabolite
+   names, `x`, `y` = pixel coords, `sample` = section, `region` = intact/lesioned). Add a test in
+   `tests/test_spatial.py` on a tiny synthetic frame. **Do not `log`** the intensities; pass them
+   to `LinearNMF(loss=...)` directly. Pick the loss with the variance-vs-mean diagnostic
+   (`diagnostics.variance_vs_mean`) — MSI gain noise is usually variance ∝ mean² ⇒ **IS**, but
+   verify; counts-like ⇒ KL.
+2. **Run saturation diagnostics first** (§4): FMP-10 monoamine ions can saturate; check the
+   per-ion histogram and, if a pile-up is present, fit with `build_saturation_mask`.
+3. **Decompose** the dopaminergic metabolite block with Route 2 (`LinearNMF`), `K` small.
+   `illustrate_component` for the pathway-activity graph (use the existing catecholamine edge
+   set in `gait/illustration`) and image. Compare the **spatial pattern** to the transcriptomic
+   dopaminergic component from `demo_visium_dopamine.py` — they are *not* aligned pixel-to-pixel
+   (different modalities, adjacent sections), so compare *region-level* structure, not per-pixel.
+4. **Test the prediction**: score the dopamine-metabolite component on the intact-vs-lesioned
+   axis (reuse `region_auc` from `robustness_multisection.py`). Expectation: the **metabolite**
+   component separates the lesion (high AUC) while the **transcript** component did not (~0.55).
+   If it holds, that is the multimodal dissociation — promote the PROVISIONAL subsection and add
+   a side-by-side figure (transcript map vs metabolite map vs lesion annotation).
+5. Also report the **`direction`** term for the metabolite component: with FMP-10 the
+   dopaminergic ions are genuinely different molecules, so a real lesion effect should show as a
+   magnitude collapse in the lesioned hemisphere, not merely a re-weighting.
+
+## 7.4 Expected parquet schema (what we asked Fei for)
+
+One **row per pixel**; columns:
+
+- `section` (or `sample`) — section / slide id (string);
+- `x`, `y` — pixel coordinates (µm or pixel index);
+- `region` / `condition` — *optional but wanted*: intact vs 6-OHDA-lesioned hemisphere (or
+  anatomical region);
+- one **numeric column per metabolite**, **linear** intensities (raw or TIC-normalised; **not**
+  log-transformed), named by annotation (`dopamine`, `DOPA`, `3-MT`, `DOPAC`, `HVA`,
+  `norepinephrine`, …) and/or m/z. Ideally an accompanying m/z + annotation key so the pathway
+  graph can be labelled.
+
+If Fei sends all FMP-10-annotated peaks rather than just the dopaminergic subset, select the
+dopaminergic metabolites in the loader.
+
+## 7.5 Environment / workflow notes
+
+- The repo was renamed `colorpath` -> `gait` (package dir `gait/`, `pyproject.toml` name `gait`,
+  pip-installable; `[visium]` extra pulls `h5py`, `[figures]` extra pulls `pandas`/`pyarrow` —
+  `pyarrow` is what reads the parquet). Continuing **locally** avoids the remote sandbox's
+  no-egress limit and the post-rename push-to-`main` restriction.
+- Manuscript: `manuscript/main.tex` (+ `ref.bib`, `Makefile`, `make_figures.py`). Title:
+  *"Multiplicatively-coherent spatial pathway-activity analysis…"*. Build with
+  `cd manuscript && make main.pdf`. Do not commit generated PDFs/figures.
+- Key references already in `ref.bib`: GSEA (subramanian2005), pathway-analysis review
+  (khatri2012), gene-set null methodology (goeman2007), MIPath (jeuken2024), survival pathway
+  activity (jeuken2022), plus the IMS/NMF/HSIC stack.
