@@ -210,8 +210,15 @@ def regional_structure_score(U, V, coords, k_neighbors: int = 6) -> dict:
       *regional difference*), ~1 when several programs each own a domain.
 
     The product ``score = coherence * diversity`` is high only when the pathway forms several
-    spatially-coherent domains -- i.e. clear regional differences in activity. Returns a dict
-    with ``score``, ``coherence``, ``diversity`` and the per-component Moran's I.
+    spatially-coherent domains -- i.e. clear regional differences in activity. Note this
+    certifies regionally-organised *activity* but not, on its own, a different *program*: a
+    single program that merely varies in level can be carved by NMF into several collinear
+    components. The returned ``direction`` (see :func:`loading_direction_distinctness`) is a
+    magnitude-invariant companion that is near 0 for such pure-magnitude gradients and toward
+    1 when the owning components have genuinely different gene composition.
+
+    Returns a dict with ``score``, ``coherence``, ``diversity``, ``direction`` and the
+    per-component Moran's I.
     """
     U = np.asarray(U, dtype=float)
     V = np.asarray(V, dtype=float)
@@ -223,8 +230,46 @@ def regional_structure_score(U, V, coords, k_neighbors: int = 6) -> dict:
     coherence = float(np.sum(share * np.clip(morans, 0, None)))
     p = share[share > 0]
     diversity = float(-(p * np.log(p)).sum() / np.log(K)) if K > 1 else 0.0
+    direction = loading_direction_distinctness(V, dom)
     return {"score": coherence * diversity, "coherence": coherence,
-            "diversity": diversity, "morans_per_component": morans}
+            "diversity": diversity, "direction": direction,
+            "morans_per_component": morans}
+
+
+def loading_direction_distinctness(V, dom) -> float:
+    """How distinct are the *loading directions* of the components that own territory?
+
+    A magnitude-invariant companion to :func:`regional_structure_score`. The score there is
+    high whenever the activity forms several spatially-coherent domains -- but NMF will also
+    carve a single program that merely *varies in level* across the tissue into several
+    components whose loading vectors ``V[k, :]`` are nearly **collinear** (same genes, just
+    scaled). Such an over-factorised magnitude gradient is a difference in *amount*, not a
+    genuinely different co-regulation *program*.
+
+    This term separates the two. Among the components that actually own spots in the
+    dominant-component map ``dom``, it returns
+
+        direction = 1 - max_{i<j} cos( V[i, :], V[j, :] ),
+
+    the cosine being scale-invariant in gene space. Collinear loadings (pure magnitude
+    gradient) give ``direction ~ 0``; owning components with genuinely different gene
+    composition (a different program in a different region) give ``direction`` toward 1.
+
+    Returns ``0.0`` when fewer than two components own territory (nothing to contrast).
+    """
+    V = np.asarray(V, dtype=float)
+    owners = np.unique(np.asarray(dom))
+    if owners.size < 2:
+        return 0.0
+    Vo = V[owners]
+    norms = np.linalg.norm(Vo, axis=1)
+    keep = norms > EPS
+    Vo, norms = Vo[keep], norms[keep]
+    if Vo.shape[0] < 2:
+        return 0.0
+    cos = (Vo @ Vo.T) / np.outer(norms, norms)
+    iu = np.triu_indices(Vo.shape[0], k=1)
+    return float(1.0 - np.clip(cos[iu], -1.0, 1.0).max())
 
 
 def format_table(results: dict[str, dict[str, float]]) -> str:

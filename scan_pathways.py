@@ -101,7 +101,8 @@ def score_one_section(exp, gmt, min_genes, K, max_iter, keep_dom=False):
         res = LinearNMF(K, loss="kl", max_iter=max_iter, random_state=0).fit(Xs)
         sc = regional_structure_score(res.U, res.V, coords)
         row = {"pathway": name, "n_genes": len(present), "score": sc["score"],
-               "coherence": sc["coherence"], "diversity": sc["diversity"]}
+               "coherence": sc["coherence"], "diversity": sc["diversity"],
+               "direction": sc["direction"]}
         if keep_dom:
             row["dom"] = dominant_component(res.U, res.V)
         rows.append(row)
@@ -119,14 +120,15 @@ def scan_single(tar, names, section, gmt, min_genes, K, top, max_iter):
 
     out_csv = f"pathway_scan_{label}.csv"
     with open(out_csv, "w") as fh:
-        fh.write("rank,pathway,n_genes,score,coherence,diversity\n")
+        fh.write("rank,pathway,n_genes,score,coherence,diversity,direction\n")
         for r, row in enumerate(rows, 1):
             fh.write(f"{r},{row['pathway']},{row['n_genes']},{row['score']:.4f},"
-                     f"{row['coherence']:.4f},{row['diversity']:.4f}\n")
-    print("\ntop pathways by regional-structure score:")
+                     f"{row['coherence']:.4f},{row['diversity']:.4f},{row['direction']:.4f}\n")
+    print("\ntop pathways by regional-structure score "
+          "(dir = magnitude-invariant loading-direction distinctness):")
     for row in rows[:min(top, len(rows))]:
         print(f"  {row['score']:.3f}  (coh {row['coherence']:.2f} div {row['diversity']:.2f}"
-              f" n={row['n_genes']:>3})  {row['pathway']}")
+              f" dir {row['direction']:.2f} n={row['n_genes']:>3})  {row['pathway']}")
 
     n = min(top, len(rows))
     if n:
@@ -155,6 +157,7 @@ def scan_multi(tar, names, match, gmt, min_genes, K, top, max_iter):
     print(f"[scan] {len(sel)} sections matching {match!r}; {len(gmt)} pathways")
     scores: dict[str, list[float]] = {}
     ranks: dict[str, list[int]] = {}
+    directions: dict[str, list[float]] = {}
     n_genes: dict[str, int] = {}
     for pre in sel:
         label, exp = _load_prefix(tar, names, pre)
@@ -163,21 +166,25 @@ def scan_multi(tar, names, match, gmt, min_genes, K, top, max_iter):
         for rank, row in enumerate(rows, 1):
             scores.setdefault(row["pathway"], []).append(row["score"])
             ranks.setdefault(row["pathway"], []).append(rank)
+            directions.setdefault(row["pathway"], []).append(row["direction"])
             n_genes[row["pathway"]] = row["n_genes"]
     agg = [{"pathway": p, "n_sections": len(s), "median_score": float(np.median(s)),
-            "median_rank": float(np.median(ranks[p])), "n_genes": n_genes[p]}
+            "median_rank": float(np.median(ranks[p])),
+            "median_direction": float(np.median(directions[p])), "n_genes": n_genes[p]}
            for p, s in scores.items()]
     agg.sort(key=lambda r: -r["median_score"])
 
     out_csv = f"pathway_scan_{match}_aggregate.csv"
     with open(out_csv, "w") as fh:
-        fh.write("rank,pathway,n_sections,median_score,median_rank,n_genes\n")
+        fh.write("rank,pathway,n_sections,median_score,median_rank,median_direction,n_genes\n")
         for r, row in enumerate(agg, 1):
             fh.write(f"{r},{row['pathway']},{row['n_sections']},{row['median_score']:.4f},"
-                     f"{row['median_rank']:.1f},{row['n_genes']}\n")
-    print(f"\ntop pathways by median regional-structure score across {len(sel)} sections:")
+                     f"{row['median_rank']:.1f},{row['median_direction']:.4f},{row['n_genes']}\n")
+    print(f"\ntop pathways by median regional-structure score across {len(sel)} sections "
+          f"(med-dir = magnitude-invariant loading-direction distinctness):")
     for row in agg[:min(top, len(agg))]:
         print(f"  med {row['median_score']:.3f}  med-rank {row['median_rank']:>4.0f}  "
+              f"med-dir {row['median_direction']:.2f}  "
               f"(n_sec {row['n_sections']}/{len(sel)}, genes {row['n_genes']:>3})  {row['pathway']}")
     print(f"\nwrote {out_csv}")
 

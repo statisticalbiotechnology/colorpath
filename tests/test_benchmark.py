@@ -74,6 +74,26 @@ def test_regional_structure_score_domains_vs_intermixed():
     assert s_dom > 0.2
 
 
+def test_direction_separates_magnitude_gradient_from_distinct_programs():
+    # Two spatially-segregated domains (high score in both cases below).
+    side = 20
+    yy, xx = np.mgrid[0:side, 0:side]
+    coords = np.column_stack([xx.ravel(), yy.ravel()])
+    rng = np.random.default_rng(1)
+    P = side * side
+    left = (xx.ravel() < side / 2)
+    U = np.column_stack([left + 0.05 * rng.random(P), (~left) + 0.05 * rng.random(P)])
+    # Collinear loadings: same program, components differ only in level -> direction ~ 0.
+    V_mag = np.array([[1.0, 0.5, 0.2], [2.0, 1.0, 0.4]])
+    # Distinct loadings: different gene composition per domain -> direction toward 1.
+    V_prog = np.array([[1.0, 0.0, 0.2], [0.0, 1.0, 0.2]])
+    d_mag = regional_structure_score(U, V_mag, coords)["direction"]
+    d_prog = regional_structure_score(U, V_prog, coords)["direction"]
+    assert d_mag < 0.05
+    assert d_prog > 0.5
+    assert d_prog > d_mag
+
+
 def test_region_mutual_information_detects_alignment():
     regions = np.array([0, 0, 0, 1, 1, 1])
     aligned = np.array([2, 2, 2, 5, 5, 5])        # perfectly predicts region
