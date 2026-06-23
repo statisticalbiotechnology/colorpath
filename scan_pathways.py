@@ -64,8 +64,18 @@ def read_gmt(path: str) -> dict[str, list[str]]:
     return sets
 
 
+def _load_prefix(tar, names, prefix):
+    """Load the Visium section at an exact tar prefix (counts + coords; no annotation)."""
+    pos = _member(set(names), prefix, "tissue_positions_list.csv")
+    with tempfile.TemporaryDirectory() as tmp:
+        h5 = _extract(tar, prefix + "filtered_feature_bc_matrix.h5", tmp)
+        posp = _extract(tar, pos, tmp)
+        exp = load_visium_10x_h5(h5, posp)
+    return prefix.strip("_").replace("_RNA", ""), exp
+
+
 def load_section(tar, names, section):
-    """Load one Visium section (counts + coords; no region annotation needed)."""
+    """Load one section by name substring (default: the first section in the tar)."""
     prefixes = sample_prefixes(names)
     if section:
         hits = [p for p in prefixes if section in p]
@@ -75,22 +85,11 @@ def load_section(tar, names, section):
         prefix = hits[0]
     else:
         prefix = prefixes[0]
-    pos = _member(set(names), prefix, "tissue_positions_list.csv")
-    with tempfile.TemporaryDirectory() as tmp:
-        h5 = _extract(tar, prefix + "filtered_feature_bc_matrix.h5", tmp)
-        posp = _extract(tar, pos, tmp)
-        exp = load_visium_10x_h5(h5, posp)
-    return prefix.strip("_").replace("_RNA", ""), exp
+    return _load_prefix(tar, names, prefix)
 
 
-def main(tar_path, gmt_path, section, min_genes, K, top, max_iter):
-    gmt = read_gmt(gmt_path)
-    with tarfile.open(tar_path) as tar:
-        names = tar.getnames()
-        label, exp = load_section(tar, names, section)
-    print(f"[scan] section {label}: {exp.n_spots} spots; {len(gmt)} pathways in "
-          f"{os.path.basename(gmt_path)}")
-
+def score_one_section(exp, gmt, min_genes, K, max_iter, keep_dom=False):
+    """Return the pathways scored on one section, sorted by regional-structure score."""
     coords = np.column_stack([exp.x, exp.y])
     Xn = library_normalize(exp.X)
     rows = []
@@ -101,27 +100,34 @@ def main(tar_path, gmt_path, section, min_genes, K, top, max_iter):
         Xs = per_gene_scale(Xn[:, gidx])
         res = LinearNMF(K, loss="kl", max_iter=max_iter, random_state=0).fit(Xs)
         sc = regional_structure_score(res.U, res.V, coords)
-        rows.append({"pathway": name, "n_genes": len(present), **sc,
-                     "dom": dominant_component(res.U, res.V)})
-        if (i + 1) % 25 == 0:
-            print(f"  ... {i + 1}/{len(gmt)} pathways")
+        row = {"pathway": name, "n_genes": len(present), "score": sc["score"],
+               "coherence": sc["coherence"], "diversity": sc["diversity"]}
+        if keep_dom:
+            row["dom"] = dominant_component(res.U, res.V)
+        rows.append(row)
+        if (i + 1) % 50 == 0:
+            print(f"    ... {i + 1}/{len(gmt)} pathways")
     rows.sort(key=lambda r: -r["score"])
+    return rows
+
+
+def scan_single(tar, names, section, gmt, min_genes, K, top, max_iter):
+    label, exp = load_section(tar, names, section)
+    print(f"[scan] section {label}: {exp.n_spots} spots; {len(gmt)} pathways")
+    rows = score_one_section(exp, gmt, min_genes, K, max_iter, keep_dom=True)
     print(f"[scan] scored {len(rows)} pathways (>= {min_genes} genes present)")
 
-    # ranked CSV
     out_csv = f"pathway_scan_{label}.csv"
     with open(out_csv, "w") as fh:
         fh.write("rank,pathway,n_genes,score,coherence,diversity\n")
         for r, row in enumerate(rows, 1):
             fh.write(f"{r},{row['pathway']},{row['n_genes']},{row['score']:.4f},"
                      f"{row['coherence']:.4f},{row['diversity']:.4f}\n")
-
     print("\ntop pathways by regional-structure score:")
     for row in rows[:min(top, len(rows))]:
         print(f"  {row['score']:.3f}  (coh {row['coherence']:.2f} div {row['diversity']:.2f}"
               f" n={row['n_genes']:>3})  {row['pathway']}")
 
-    # maps of the top hits
     n = min(top, len(rows))
     if n:
         ncol = min(4, n); nrow = (n + ncol - 1) // ncol
@@ -134,11 +140,56 @@ def main(tar_path, gmt_path, section, min_genes, K, top, max_iter):
                        cmap=ListedColormap(plt.cm.tab10.colors[:K]), vmin=-0.5, vmax=K - 0.5)
             ax.set_title(f"{row['pathway'][:34]}\nscore={row['score']:.2f}", fontsize=7)
             ax.set_aspect("equal"); ax.invert_yaxis(); ax.set_xticks([]); ax.set_yticks([])
-        fig.suptitle(f"Top regionally-structured KEGG pathways — section {label} "
+        fig.suptitle(f"Top regionally-structured pathways — section {label} "
                      f"(GAIT KL-NMF, K={K})", fontweight="bold")
         out_png = f"pathway_scan_{label}_top.png"
         fig.savefig(out_png, dpi=150, bbox_inches="tight"); plt.close(fig)
         print(f"\nwrote {out_csv} and {out_png}")
+
+
+def scan_multi(tar, names, match, gmt, min_genes, K, top, max_iter):
+    """Aggregate the scan over every section whose prefix contains ``match``."""
+    sel = [p for p in sample_prefixes(names) if match in p]
+    if not sel:
+        sys.exit(f"no sections matching {match!r}")
+    print(f"[scan] {len(sel)} sections matching {match!r}; {len(gmt)} pathways")
+    scores: dict[str, list[float]] = {}
+    ranks: dict[str, list[int]] = {}
+    n_genes: dict[str, int] = {}
+    for pre in sel:
+        label, exp = _load_prefix(tar, names, pre)
+        rows = score_one_section(exp, gmt, min_genes, K, max_iter)
+        print(f"  {label}: scored {len(rows)} pathways")
+        for rank, row in enumerate(rows, 1):
+            scores.setdefault(row["pathway"], []).append(row["score"])
+            ranks.setdefault(row["pathway"], []).append(rank)
+            n_genes[row["pathway"]] = row["n_genes"]
+    agg = [{"pathway": p, "n_sections": len(s), "median_score": float(np.median(s)),
+            "median_rank": float(np.median(ranks[p])), "n_genes": n_genes[p]}
+           for p, s in scores.items()]
+    agg.sort(key=lambda r: -r["median_score"])
+
+    out_csv = f"pathway_scan_{match}_aggregate.csv"
+    with open(out_csv, "w") as fh:
+        fh.write("rank,pathway,n_sections,median_score,median_rank,n_genes\n")
+        for r, row in enumerate(agg, 1):
+            fh.write(f"{r},{row['pathway']},{row['n_sections']},{row['median_score']:.4f},"
+                     f"{row['median_rank']:.1f},{row['n_genes']}\n")
+    print(f"\ntop pathways by median regional-structure score across {len(sel)} sections:")
+    for row in agg[:min(top, len(agg))]:
+        print(f"  med {row['median_score']:.3f}  med-rank {row['median_rank']:>4.0f}  "
+              f"(n_sec {row['n_sections']}/{len(sel)}, genes {row['n_genes']:>3})  {row['pathway']}")
+    print(f"\nwrote {out_csv}")
+
+
+def main(tar_path, gmt_path, section, match, min_genes, K, top, max_iter):
+    gmt = read_gmt(gmt_path)
+    with tarfile.open(tar_path) as tar:
+        names = tar.getnames()
+        if match:
+            scan_multi(tar, names, match, gmt, min_genes, K, top, max_iter)
+        else:
+            scan_single(tar, names, section, gmt, min_genes, K, top, max_iter)
 
 
 if __name__ == "__main__":
@@ -147,8 +198,11 @@ if __name__ == "__main__":
     ap.add_argument("tar", nargs="?", default=default_tar, help="GSE..._RAW.tar bundle")
     ap.add_argument("gmt", help="gene-set .gmt (e.g. a KEGG collection; symbols)")
     ap.add_argument("--section", default=None,
-                    help="substring of the section to scan (default: first; use a striatal "
-                         "one e.g. V11L12-038_A1)")
+                    help="substring of a single section to scan (default: first; e.g. "
+                         "V11L12-038_A1)")
+    ap.add_argument("--match", default=None,
+                    help="scan ALL sections whose name contains this substring and aggregate "
+                         "by median score/rank (e.g. V11L12 for the striatal slides)")
     ap.add_argument("--min-genes", type=int, default=10, help="min pathway genes present")
     ap.add_argument("--K", type=int, default=5, help="components")
     ap.add_argument("--top", type=int, default=16, help="top hits to print/plot")
@@ -158,4 +212,5 @@ if __name__ == "__main__":
         sys.exit(f"tar not found: {args.tar}")
     if not os.path.exists(args.gmt):
         sys.exit(f"gmt not found: {args.gmt}")
-    main(args.tar, args.gmt, args.section, args.min_genes, args.K, args.top, args.max_iter)
+    main(args.tar, args.gmt, args.section, args.match, args.min_genes, args.K, args.top,
+         args.max_iter)

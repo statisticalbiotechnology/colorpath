@@ -119,7 +119,12 @@ distinction no per-pathway enrichment score can represent.
 We therefore pose \emph{spatial pathway-activity analysis}: rather than score a pathway, we
 \emph{decompose} it into spatial components, each a \emph{where} (a tissue activity map)
 paired with a \emph{which} (a feature-loading vector), so that region-specific sub-programmes
-become first-class objects. What such a decomposition should optimise is fixed by two
+become first-class objects. Estimating a sample-level pathway \emph{activity} --- instead of
+testing its genes for enrichment --- has precedent: such activities are stronger prognostic
+markers than the individual transcripts \citep{jeuken2022}, and their association with a
+phenotype can be scored by mutual information without gene-level comparisons
+\citep{jeuken2024}; GAIT carries this paradigm into tissue space and makes it
+multiplicatively coherent. What such a decomposition should optimise is fixed by two
 properties of the data that one conventional choice --- the log transform --- fatally
 entangles. \textbf{(R2)} Pathway coupling is \emph{multiplicative}: co-regulated features
 scale together, so a pathway is a rank-one outer product $u\,v^{\!\top}$ of a per-location
