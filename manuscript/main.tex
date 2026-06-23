@@ -589,9 +589,14 @@ will test on the matched FMP-10 data.
 Because the score underlying these maps requires no region annotation --- a
 dominant-component-weighted Moran's I of the component activities times the entropy of the
 dominant-component map --- it can rank \emph{arbitrary} pathways by how regionally structured
-their activity is. Applied across a KEGG collection (\code{scan\_pathways.py}) it gives an
-unbiased screen for the pathways most likely to be differentially regulated across the tissue,
-with the annotation-based AUCs above serving as positive controls.
+their activity is. Scanning the 304 KEGG pathways on a striatal section (\code{scan\_pathways.py}),
+the highest-scoring of the 295 with sufficient genes are the \emph{synaptic} pathways ---
+\textbf{GABAergic, dopaminergic and glutamatergic synapse} --- followed by cAMP, calcium and
+retrograde-endocannabinoid signalling and neuroactive ligand--receptor interaction: the screen
+recovers the striatal neurotransmission biology with no annotation and reproduces the
+supervised ranking above, two independent metrics in agreement. (KEGG gene-set overlap means
+several lower hits, e.g.\ the addiction pathways, largely re-detect the same synaptic
+programmes rather than independent biology.)
 
 \begin{table}[t]
   \centering
