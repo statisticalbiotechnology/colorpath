@@ -606,7 +606,24 @@ recovers the striatal neurotransmission biology with no annotation and reproduce
 ranking above, two independent metrics in agreement. The \emph{class} of top pathways is stable
 section-to-section even where the exact order is not: the GABAergic-synapse set, top-ranked on
 the single section first examined, falls to a median rank of $12$ across the eight, whereas the
-dopaminergic synapse holds a median rank of $4$. (KEGG gene-set overlap means several lower
+dopaminergic synapse holds a median rank of $4$.
+
+The score so far certifies that a pathway's activity is spatially organised into several
+coherent domains, but a single program that merely \emph{varies in level} across the tissue can
+be split by NMF into near-collinear components and score highly too --- a difference in
+\emph{amount}, not a different co-regulation \emph{program}. To separate the two we report a
+magnitude-invariant companion, the loading-direction distinctness
+$1-\max_{i<j}\cos(V_i,V_j)$ over the components that own territory (scale-invariant in gene
+space; $\approx 0$ for a pure level gradient, toward $1$ for genuinely different gene
+composition). Across the eight sections the top synaptic pathways carry an
+\emph{intermediate} median distinctness ($0.3$--$0.5$): they are not pure abundance gradients
+--- the regions do differ in which genes load --- but neither are they fully distinct
+programmes. The broadest second-messenger pathways lean most toward the magnitude reading
+(calcium $0.28$, cAMP and dopaminergic synapse $0.31$), whereas the sets with the most
+regionally \emph{distinct} composition are the receptor/transmitter-defined ones (morphine
+addiction $0.53$, neuroactive ligand--receptor $0.45$, GABAergic synapse $0.44$). The headline
+localisation is therefore largely an abundance contrast with a real but moderate compositional
+component, a distinction the matched-modality data will let us resolve. (KEGG gene-set overlap means several lower
 hits, e.g.\ the addiction pathways, largely re-detect the same synaptic programmes rather than
 independent biology.)
 
